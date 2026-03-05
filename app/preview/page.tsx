@@ -13,31 +13,81 @@ interface PreviewPayload {
 function PreviewPageContent() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+    const controller = new AbortController()
     const id = searchParams.get('id')
 
     if (!id) {
       setError('Missing preview id')
+      setLoading(false)
       return
     }
 
-    const payloadRaw = window.localStorage.getItem(`preview-payload-${id}`)
-    if (!payloadRaw) {
-      setError('Preview content not found')
-      return
+    const renderPreview = async (previewId: string) => {
+      if (!isMounted) return
+
+      setLoading(true)
+      setError(null)
+
+      try {
+        const response = await fetch(`/api/previews/${previewId}`, {
+          signal: controller.signal,
+          cache: 'no-store',
+        })
+
+        if (!isMounted) return
+
+        if (!response.ok) {
+          setError('Preview content not found')
+          setLoading(false)
+          return
+        }
+
+        const payload = (await response.json()) as PreviewPayload
+        if (!isMounted) return
+
+        if (!payload?.code || (payload.format !== 'html' && payload.format !== 'nextjs')) {
+          setError('Preview payload is invalid')
+          setLoading(false)
+          return
+        }
+
+        const htmlString = buildPreviewHTML(payload.code, payload.format)
+        if (!isMounted) return
+
+        document.open()
+        document.write(htmlString)
+        document.close()
+
+        setLoading(false)
+      } catch {
+        if (!isMounted || controller.signal.aborted) {
+          return
+        }
+
+        setError('Failed to render preview')
+        setLoading(false)
+      }
     }
 
-    try {
-      const payload = JSON.parse(payloadRaw) as PreviewPayload
-      const html = buildPreviewHTML(payload.code, payload.format)
-      document.open()
-      document.write(html)
-      document.close()
-    } catch {
-      setError('Failed to render preview')
+    void renderPreview(id)
+
+    return () => {
+      isMounted = false
+      controller.abort()
     }
   }, [searchParams])
+
+  if (loading && !error) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-4 text-center font-sans">
+        <div className="rounded-lg border border-neutral-300 bg-white p-4 text-sm font-semibold text-neutral-700">Loading preview...</div>
+      </main>
+    )
+  }
 
   if (!error) {
     return null
