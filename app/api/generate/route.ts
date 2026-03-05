@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import {
+  GEMINI_PRODUCTION_MODELS,
+  type GeminiAttemptLog,
+  type GeminiModel,
+} from '@/lib/ai-models'
 
 const SYSTEM_PROMPT_HTML = `You are an elite frontend developer. Convert the provided UI screenshot into production-ready HTML with Tailwind CSS utility classes.
 
@@ -33,7 +38,8 @@ Rules:
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { image, format, provider, geminiApiKey, ollamaUrl } = body
+    const { image, format, provider, geminiApiKey, ollamaUrl, ollamaModel } =
+      body
 
     if (!image) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 })
@@ -47,7 +53,12 @@ export async function POST(request: NextRequest) {
     if (provider === 'gemini') {
       code = await generateWithGemini(image, systemPrompt, geminiApiKey)
     } else {
-      code = await generateWithOllama(image, systemPrompt, ollamaUrl)
+      code = await generateWithOllama(
+        image,
+        systemPrompt,
+        ollamaUrl,
+        ollamaModel
+      )
     }
 
     // Clean the code - remove markdown code fences if present
@@ -81,20 +92,10 @@ async function generateWithGemini(
   const mimeType = match[1]
   const base64Data = match[2]
 
-  const MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-3.0-flash",
-    "gemini-3.0-pro",
-    "gemini-3.1-flash",
-    "gemini-3.1-pro"
-  ]
+  let lastError: unknown = null
+  const attempts: GeminiAttemptLog[] = []
 
-  let lastError: any = null
-
-  for (const model of MODELS) {
+  for (const model of GEMINI_PRODUCTION_MODELS) {
     try {
 
       const response = await fetch(
@@ -131,7 +132,17 @@ async function generateWithGemini(
 
       if (!response.ok) {
         const err = await response.json()
-        throw new Error(err?.error?.message || `HTTP ${response.status}`)
+        const reason = err?.error?.message || `HTTP ${response.status}`
+
+        if (
+          response.status === 404 ||
+          response.status === 400 ||
+          /not found|not supported|unsupported|not available/i.test(reason)
+        ) {
+          throw new GeminiModelCompatibilityError(model, reason)
+        }
+
+        throw new Error(reason)
       }
 
       const data = await response.json()
@@ -143,31 +154,76 @@ async function generateWithGemini(
         throw new Error("Empty response")
       }
 
-      console.log(`Gemini success with model: ${model}`)
+      attempts.push({ model, status: 'success' })
+      logGeminiAttempts(attempts)
 
       return text
 
-    } catch (err: any) {
-
-      console.warn(`Gemini failed: ${model}`, err.message)
-
+    } catch (err: unknown) {
+      attempts.push({
+        model,
+        status: 'failed',
+        reason: err instanceof Error ? err.message : 'Unknown error',
+      })
       lastError = err
-
       continue
     }
   }
 
+  logGeminiAttempts(attempts)
+
+  if (lastError instanceof GeminiModelCompatibilityError) {
+    throw new Error(
+      `Generation failed due to model compatibility issue. ${lastError.message}`
+    )
+  }
+
   throw new Error(
-    `All Gemini models failed. Last error: ${lastError?.message}`
+    `All production Gemini models failed. Last error: ${
+      lastError instanceof Error ? lastError.message : 'Unknown error'
+    }`
   )
+}
+
+function logGeminiAttempts(attempts: GeminiAttemptLog[]) {
+  const failed = attempts
+    .filter((attempt) => attempt.status === 'failed')
+    .map((attempt) => `${attempt.model} (${attempt.reason})`)
+  const success = attempts.find((attempt) => attempt.status === 'success')?.model
+
+  console.info('[Gemini] model attempts summary', {
+    success,
+    failed,
+    tried: attempts.map((attempt) => attempt.model),
+  })
+}
+
+class GeminiModelCompatibilityError extends Error {
+  constructor(model: GeminiModel, reason: string) {
+    super(`Model '${model}' is unavailable or incompatible: ${reason}`)
+    this.name = 'GeminiModelCompatibilityError'
+  }
 }
 
 async function generateWithOllama(
   image: string,
   systemPrompt: string,
-  serverUrl: string
+  serverUrl: string,
+  model: string
 ): Promise<string> {
   const url = serverUrl || 'http://localhost:11434'
+
+  if (typeof model !== 'string' || !model.trim()) {
+    throw new Error('Ollama model is required. Please select a valid model.')
+  }
+
+  const normalizedModel = model.trim()
+
+  if (!/^[a-zA-Z0-9._:-]+$/.test(normalizedModel)) {
+    throw new Error(
+      'Invalid Ollama model name. Use only letters, numbers, dot (.), dash (-), underscore (_), or colon (:).'
+    )
+  }
 
   // Extract base64 data
   const base64Data = image.replace(/^data:image\/\w+;base64,/, '')
@@ -176,7 +232,7 @@ async function generateWithOllama(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'llava',
+      model: normalizedModel || 'llava',
       prompt: `${systemPrompt}\n\nConvert this UI screenshot to code. Output ONLY the code, no explanations.`,
       images: [base64Data],
       stream: false,
