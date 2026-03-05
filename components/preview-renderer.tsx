@@ -17,8 +17,6 @@ interface PreviewHistoryItem {
   format: ExportFormat
 }
 
-const PREVIEW_HISTORY_KEY = 'preview-history'
-
 export function PreviewRenderer() {
   const { generatedCode, exportFormat, viewport, setViewport, uploadedImage } = useAppStore()
   const [previewId, setPreviewId] = useState('')
@@ -39,34 +37,36 @@ export function PreviewRenderer() {
     return `/preview?id=${selectedHistoryId}`
   }, [selectedHistoryId])
 
-  const loadHistory = useCallback(() => {
+  const loadHistory = useCallback(async () => {
     try {
-      const raw = window.localStorage.getItem(PREVIEW_HISTORY_KEY)
-      if (!raw) {
+      const response = await fetch('/api/previews')
+      if (!response.ok) {
         setHistoryItems([])
         return
       }
 
-      const parsed = JSON.parse(raw) as unknown
-      if (!Array.isArray(parsed)) {
+      const data = (await response.json()) as { history?: unknown }
+      const rawHistory = data?.history
+
+      if (!Array.isArray(rawHistory)) {
         setHistoryItems([])
         return
       }
 
-      const nextItems: PreviewHistoryItem[] = parsed
-        .filter((item): item is PreviewHistoryItem => {
-          if (!item || typeof item !== 'object') return false
-          const obj = item as Partial<PreviewHistoryItem>
-          return (
-            typeof obj.id === 'string' &&
-            typeof obj.createdAt === 'number' &&
-            (obj.format === 'html' || obj.format === 'nextjs')
-          )
-        })
-        .slice(0, 20)
+      const nextItems = rawHistory.filter((item): item is PreviewHistoryItem => {
+        if (!item || typeof item !== 'object') return false
+        const previewItem = item as Partial<PreviewHistoryItem>
+
+        return (
+          typeof previewItem.id === 'string' &&
+          typeof previewItem.createdAt === 'number' &&
+          (previewItem.format === 'html' || previewItem.format === 'nextjs')
+        )
+      })
 
       setHistoryItems(nextItems)
-      if (!selectedHistoryId && nextItems.length > 0) {
+
+      if (nextItems.length > 0 && !selectedHistoryId) {
         setSelectedHistoryId(nextItems[0].id)
       }
     } catch {
@@ -74,55 +74,39 @@ export function PreviewRenderer() {
     }
   }, [selectedHistoryId])
 
-  const renderPreview = useCallback(() => {
+  const renderPreview = useCallback(async () => {
     if (!generatedCode) return
 
-    const nextId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-
     try {
-      window.localStorage.setItem(
-        `preview-payload-${nextId}`,
-        JSON.stringify({
+      const response = await fetch('/api/previews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           code: generatedCode,
           format: exportFormat,
-        })
-      )
+        }),
+      })
 
-      const nextHistoryItem: PreviewHistoryItem = {
-        id: nextId,
-        createdAt: Date.now(),
-        format: exportFormat,
+      if (!response.ok) {
+        setPreviewId('')
+        return
       }
 
-      const existingRaw = window.localStorage.getItem(PREVIEW_HISTORY_KEY)
-      const existingParsed = existingRaw ? (JSON.parse(existingRaw) as unknown) : []
-      const existingItems = Array.isArray(existingParsed) ? existingParsed : []
-      const normalizedHistory = existingItems
-        .filter((item) => {
-          if (!item || typeof item !== 'object') return false
-          const obj = item as Partial<PreviewHistoryItem>
-          return (
-            typeof obj.id === 'string' &&
-            typeof obj.createdAt === 'number' &&
-            (obj.format === 'html' || obj.format === 'nextjs')
-          )
-        })
-        .map((item) => ({
-          id: String((item as PreviewHistoryItem).id),
-          createdAt: Number((item as PreviewHistoryItem).createdAt),
-          format: (item as PreviewHistoryItem).format,
-        }))
+      const data = (await response.json()) as Partial<PreviewHistoryItem>
+      if (typeof data.id !== 'string') {
+        setPreviewId('')
+        return
+      }
 
-      const nextHistory = [nextHistoryItem, ...normalizedHistory.filter((item) => item.id !== nextId)].slice(0, 20)
-      window.localStorage.setItem(PREVIEW_HISTORY_KEY, JSON.stringify(nextHistory))
-
-      setPreviewId(nextId)
-      setSelectedHistoryId(nextId)
-      setHistoryItems(nextHistory)
+      setPreviewId(data.id)
+      setSelectedHistoryId(data.id)
+      await loadHistory()
     } catch {
       setPreviewId('')
     }
-  }, [generatedCode, exportFormat])
+  }, [generatedCode, exportFormat, loadHistory])
 
   useEffect(() => {
     loadHistory()
@@ -179,7 +163,7 @@ export function PreviewRenderer() {
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-1">
-          {Array.isArray(viewportOptions) && viewportOptions.map(({ key, icon: Icon, label }) => (
+          {viewportOptions.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               onClick={() => setViewport(key)}
@@ -224,7 +208,9 @@ export function PreviewRenderer() {
           </button>
 
           <button
-            onClick={renderPreview}
+            onClick={() => {
+              void renderPreview()
+            }}
             disabled={viewMode !== 'preview'}
             className="flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Refresh preview"
@@ -248,7 +234,7 @@ export function PreviewRenderer() {
             className="w-full max-w-[280px] border-2 border-foreground bg-white px-2 py-1 text-xs font-bold text-foreground outline-none"
           >
             {historyItems.length === 0 && <option value="">No history</option>}
-            {Array.isArray(historyItems) && historyItems.map((item) => (
+            {historyItems.map((item) => (
               <option key={item.id} value={item.id}>
                 {new Date(item.createdAt).toLocaleString()} • {item.format.toUpperCase()}
               </option>

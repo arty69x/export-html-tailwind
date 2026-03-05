@@ -22,21 +22,30 @@ function PreviewPageContent() {
       return
     }
 
-    const payloadRaw = window.localStorage.getItem(`preview-payload-${id}`)
-    if (!payloadRaw) {
-      setError('Preview content not found')
-      return
+    const renderPreview = async () => {
+      try {
+        const response = await fetch(`/api/previews/${id}`)
+        if (!response.ok) {
+          setError('Preview content not found')
+          return
+        }
+
+        const payload = (await response.json()) as PreviewPayload
+        if (!payload?.code || (payload.format !== 'html' && payload.format !== 'nextjs')) {
+          setError('Preview payload is invalid')
+          return
+        }
+
+        const html = buildPreviewHTML(payload.code, payload.format)
+        document.open()
+        document.write(html)
+        document.close()
+      } catch {
+        setError('Failed to render preview')
+      }
     }
 
-    try {
-      const payload = JSON.parse(payloadRaw) as PreviewPayload
-      const html = buildPreviewHTML(payload.code, payload.format)
-      document.open()
-      document.write(html)
-      document.close()
-    } catch {
-      setError('Failed to render preview')
-    }
+    renderPreview()
   }, [searchParams])
 
   if (!error) {
