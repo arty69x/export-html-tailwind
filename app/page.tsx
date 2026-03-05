@@ -80,7 +80,7 @@ export default function Home() {
               </button>
               <button
                 onClick={() => setActivePanel('preview')}
-                className={`flex flex-1 items-center justify-center gap-2 border-l border-border px-4 py-3 text-sm font-bold transition-colors sm:px-6 ${
+                className={`flex flex-1 items-center justify-center gap-2 border-l-3 border-foreground px-4 py-3 text-sm font-bold transition-colors sm:px-6 ${
                   activePanel === 'preview'
                     ? 'border-b-2 border-[var(--secondary)] bg-card text-foreground'
                     : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'

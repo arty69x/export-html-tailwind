@@ -50,7 +50,7 @@ export function PreviewRenderer() {
   if (!generatedCode) {
     return (
       <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-4 p-6 sm:p-8 lg:min-h-[400px]">
-        <div className="flex size-14 items-center justify-center rounded-md border border-border bg-card">
+        <div className="flex size-14 items-center justify-center border-3 border-foreground bg-[var(--accent)] shadow-[4px_4px_0px_0px_var(--foreground)]">
           <Monitor className="size-7 text-foreground" />
         </div>
         <div className="text-center">
@@ -63,8 +63,8 @@ export function PreviewRenderer() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2 sm:px-4">
-        <span className="rounded border border-border bg-card px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-muted-foreground lg:text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b-3 border-foreground bg-muted px-3 py-2 sm:px-4">
+        <span className="border-2 border-foreground bg-card px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-muted-foreground lg:text-xs">
           Preview
         </span>
         <div className="flex flex-wrap items-center justify-end gap-1">
@@ -72,7 +72,7 @@ export function PreviewRenderer() {
             <button
               key={key}
               onClick={() => setViewport(key)}
-              className={`flex min-h-[36px] min-w-[36px] items-center justify-center rounded border border-border p-1.5 transition-all ${
+              className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
                 viewport === key
                   ? 'bg-[var(--secondary)]/30 text-foreground'
                   : 'bg-card text-foreground hover:bg-muted'
@@ -87,8 +87,8 @@ export function PreviewRenderer() {
           <button
             onClick={() => setShowOverlay((prev) => !prev)}
             disabled={!uploadedImage}
-            className={`flex min-h-[36px] min-w-[36px] items-center justify-center rounded border border-border p-1.5 transition-all ${
-              showOverlay ? 'bg-[var(--accent)]/30 text-foreground' : 'bg-card text-foreground hover:bg-muted'
+            className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
+              showOverlay ? 'bg-[var(--accent)] text-foreground' : 'bg-card text-foreground hover:bg-muted'
             } disabled:cursor-not-allowed disabled:opacity-50`}
             aria-label="Toggle diff overlay"
             title="Realtime Diff Overlay Preview"
@@ -98,8 +98,8 @@ export function PreviewRenderer() {
           <button
             onClick={() => setScanEnabled((prev) => !prev)}
             disabled={!showOverlay}
-            className={`flex min-h-[36px] min-w-[36px] items-center justify-center rounded border border-border p-1.5 transition-all ${
-              scanEnabled ? 'bg-[var(--secondary)]/30 text-foreground' : 'bg-card text-foreground hover:bg-muted'
+            className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
+              scanEnabled ? 'bg-[var(--secondary)] text-foreground' : 'bg-card text-foreground hover:bg-muted'
             } disabled:cursor-not-allowed disabled:opacity-50`}
             aria-label="Toggle overlay scan"
             title="Realtime Overlay Scan"
@@ -108,7 +108,7 @@ export function PreviewRenderer() {
           </button>
           <button
             onClick={renderPreview}
-            className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded border border-border bg-card p-1.5 transition-all hover:bg-muted"
+            className="flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted"
             aria-label="Refresh preview"
             title="Refresh"
           >
@@ -118,7 +118,7 @@ export function PreviewRenderer() {
       </div>
 
       {showOverlay && uploadedImage && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2 text-xs font-bold sm:px-4">
+        <div className="flex flex-wrap items-center gap-2 border-b-3 border-foreground bg-card px-3 py-2 text-xs font-bold sm:px-4">
           <span className="text-muted-foreground">Overlay Opacity</span>
           <input
             type="range"
@@ -143,7 +143,7 @@ export function PreviewRenderer() {
           <iframe
             src={previewUrl}
             title="Live code preview"
-            className="h-full min-h-[260px] w-full rounded-md border border-border bg-white sm:min-h-[320px] lg:min-h-[400px]"
+            className="h-full min-h-[260px] w-full border-3 border-foreground bg-white shadow-[4px_4px_0px_0px_var(--foreground)] sm:min-h-[320px] sm:shadow-[6px_6px_0px_0px_var(--foreground)] lg:min-h-[400px]"
             sandbox="allow-scripts"
           />
 
