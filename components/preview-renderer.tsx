@@ -28,9 +28,50 @@ export function PreviewRenderer() {
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
 
   const previewUrl = useMemo(() => {
-    if (!previewId) return 'about:blank'
-    return `/preview?id=${previewId}`
-  }, [previewId])
+    const currentId = previewId || selectedHistoryId
+    if (!currentId) return 'about:blank'
+
+    return `/preview?id=${currentId}`
+  }, [previewId, selectedHistoryId])
+
+  const selectedHistoryUrl = useMemo(() => {
+    if (!selectedHistoryId) return 'about:blank'
+    return `/preview?id=${selectedHistoryId}`
+  }, [selectedHistoryId])
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true)
+    setHistoryError(null)
+
+    try {
+      const response = await fetch('/api/previews')
+      if (!response.ok) {
+        setHistoryItems([])
+        setSelectedHistoryId('')
+        setHistoryError('Failed to load history')
+        return
+      }
+
+      const data = (await response.json()) as { history?: unknown }
+      const rawHistory = data?.history
+
+      if (!Array.isArray(rawHistory)) {
+        setHistoryItems([])
+        setSelectedHistoryId('')
+        setHistoryError('History payload is invalid')
+        return
+      }
+
+      const nextItems = rawHistory.filter((item): item is PreviewHistoryItem => {
+        if (!item || typeof item !== 'object') return false
+        const previewItem = item as Partial<PreviewHistoryItem>
+
+        return (
+          typeof previewItem.id === 'string' &&
+          typeof previewItem.createdAt === 'number' &&
+          (previewItem.format === 'html' || previewItem.format === 'nextjs')
+        )
+      })
 
   const renderedDocument = useMemo(() => {
     if (!generatedCode) return ''
@@ -158,7 +199,7 @@ export function PreviewRenderer() {
             title="Refresh"
             type="button"
           >
-            <RefreshCw className="size-3.5" />
+            <RefreshCw className={`size-3.5 ${previewLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>

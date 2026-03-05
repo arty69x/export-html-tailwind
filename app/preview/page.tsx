@@ -13,12 +13,14 @@ interface PreviewPayload {
 function PreviewPageContent() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const id = searchParams.get('id')
 
     if (!id) {
       setError('Missing preview id')
+      setLoading(false)
       return
     }
 
@@ -47,6 +49,14 @@ function PreviewPageContent() {
 
     renderPreview()
   }, [searchParams])
+
+  if (loading && !error) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-4 text-center font-sans">
+        <div className="rounded-lg border border-neutral-300 bg-white p-4 text-sm font-semibold text-neutral-700">Loading preview...</div>
+      </main>
+    )
+  }
 
   if (!error) {
     return null
