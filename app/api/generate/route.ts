@@ -63,67 +63,103 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
-
 async function generateWithGemini(
   image: string,
   systemPrompt: string,
   apiKey: string
 ): Promise<string> {
+
   if (!apiKey) {
-    throw new Error('Gemini API key is required')
+    throw new Error("Gemini API key is required")
   }
 
-  // Extract base64 data and mime type
   const match = image.match(/^data:(image\/\w+);base64,(.+)$/)
   if (!match) {
-    throw new Error('Invalid image format')
+    throw new Error("Invalid image format")
   }
+
   const mimeType = match[1]
   const base64Data = match[2]
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: systemPrompt },
-              {
-                inlineData: {
-                  mimeType,
-                  data: base64Data,
-                },
-              },
-              {
-                text: 'Convert this UI screenshot to code. Output ONLY the code, no explanations.',
-              },
-            ],
+  const MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-3.0-flash",
+    "gemini-3.0-pro",
+    "gemini-3.1-flash",
+    "gemini-3.1-pro"
+  ]
+
+  let lastError: any = null
+
+  for (const model of MODELS) {
+    try {
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
           },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 8192,
-        },
-      }),
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: systemPrompt },
+                  {
+                    inlineData: {
+                      mimeType,
+                      data: base64Data
+                    }
+                  },
+                  {
+                    text: "Convert this UI screenshot to code. Output ONLY the code, no explanations."
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 8192
+            }
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err?.error?.message || `HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      const text =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text
+
+      if (!text) {
+        throw new Error("Empty response")
+      }
+
+      console.log(`Gemini success with model: ${model}`)
+
+      return text
+
+    } catch (err: any) {
+
+      console.warn(`Gemini failed: ${model}`, err.message)
+
+      lastError = err
+
+      continue
     }
+  }
+
+  throw new Error(
+    `All Gemini models failed. Last error: ${lastError?.message}`
   )
-
-  if (!response.ok) {
-    const errorData = await response.json()
-    throw new Error(
-      errorData?.error?.message || `Gemini API error: ${response.status}`
-    )
-  }
-
-  const data = await response.json()
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) {
-    throw new Error('No response from Gemini')
-  }
-  return text
 }
 
 async function generateWithOllama(
