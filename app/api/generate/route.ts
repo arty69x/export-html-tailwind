@@ -35,6 +35,18 @@ Rules:
 - Export the component as default export.
 - The file should be a complete, self-contained .tsx file.`
 
+
+
+function buildAgentInstruction(agentMode?: string): string {
+  switch (agentMode) {
+    case 'pixel-perfect':
+      return 'Prioritize pixel-perfect visual fidelity above speed. Match spacing, typography, and sizing with maximum precision.'
+    case 'fast':
+      return 'Prioritize response speed while preserving clean and valid output.'
+    default:
+      return 'Balance visual accuracy, clean architecture, and generation speed.'
+  }
+}
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -45,8 +57,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 })
     }
 
-    const systemPrompt =
+    const basePrompt =
       format === 'html' ? SYSTEM_PROMPT_HTML : SYSTEM_PROMPT_NEXTJS
+    const systemPrompt = `${basePrompt}
+
+Agent mode: ${buildAgentInstruction(agentMode)}`
 
     let code: string
 
