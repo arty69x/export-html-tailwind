@@ -1,8 +1,22 @@
 'use client'
 
-import { useAppStore } from '@/lib/store'
-import { Zap, Code2, FileCode2, Bot, ChevronDown, Loader2 } from 'lucide-react'
+import { useAppStore, type AgentMode } from '@/lib/store'
+import { Zap, Code2, FileCode2, Bot, Loader2, Sparkles, Gauge, Rocket } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+
+const GENERATION_STEPS = [
+  'Uploading screenshot to provider',
+  'Analyzing layout structure',
+  'Generating component code',
+  'Polishing accessibility and semantics',
+] as const
+
+const AGENT_OPTIONS: { value: AgentMode; label: string; icon: typeof Sparkles; hint: string }[] = [
+  { value: 'pixel-perfect', label: 'Pixel Perfect', icon: Sparkles, hint: 'Highest visual fidelity' },
+  { value: 'balanced', label: 'Balanced', icon: Gauge, hint: 'Best quality / speed balance' },
+  { value: 'fast', label: 'Fast', icon: Rocket, hint: 'Quickest response' },
+]
 
 export function Toolbar() {
   const {
@@ -19,9 +33,34 @@ export function Toolbar() {
     geminiApiKey,
     ollamaUrl,
     ollamaModel,
+    agentMode,
+    setAgentMode,
     settingsOpen,
     setSettingsOpen,
   } = useAppStore()
+
+  const [progressValue, setProgressValue] = useState(0)
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setProgressValue(0)
+      return
+    }
+
+    const timer = setInterval(() => {
+      setProgressValue((prev) => {
+        if (prev >= 92) return prev
+        return prev + (prev < 50 ? 12 : prev < 80 ? 6 : 2)
+      })
+    }, 550)
+
+    return () => clearInterval(timer)
+  }, [isGenerating])
+
+  const activeStep = useMemo(
+    () => Math.min(Math.floor(progressValue / 25), GENERATION_STEPS.length - 1),
+    [progressValue]
+  )
 
   const handleGenerate = async () => {
     if (!uploadedImage) {
@@ -50,6 +89,7 @@ export function Toolbar() {
           geminiApiKey,
           ollamaUrl,
           ollamaModel,
+          agentMode,
         }),
       })
 
@@ -59,6 +99,7 @@ export function Toolbar() {
       }
 
       const data = await response.json()
+      setProgressValue(100)
       setGeneratedCode(data.code)
       toast.success('Code generated successfully')
     } catch (error: unknown) {
@@ -72,9 +113,7 @@ export function Toolbar() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Controls row */}
       <div className="flex flex-wrap items-center gap-2 lg:gap-3">
-        {/* Export Format */}
         <div className="flex border-3 border-foreground">
           <button
             onClick={() => setExportFormat('html')}
@@ -102,7 +141,6 @@ export function Toolbar() {
           </button>
         </div>
 
-        {/* AI Provider */}
         <div className="flex border-3 border-foreground">
           <button
             onClick={() => setAIProvider('gemini')}
@@ -130,7 +168,6 @@ export function Toolbar() {
           </button>
         </div>
 
-        {/* Generate Button */}
         <button
           onClick={handleGenerate}
           disabled={!uploadedImage || isGenerating}
@@ -150,7 +187,35 @@ export function Toolbar() {
         </button>
       </div>
 
-      {/* Settings Panel (inline) */}
+      <div className="flex flex-wrap gap-2">
+        {AGENT_OPTIONS.map(({ value, label, hint }) => (
+          <button
+            key={value}
+            onClick={() => setAgentMode(value)}
+            className={`border-2 border-foreground px-3 py-1.5 text-xs font-bold transition-colors ${
+              agentMode === value ? 'bg-[var(--secondary)]' : 'bg-card hover:bg-muted'
+            }`}
+            aria-pressed={agentMode === value}
+            title={hint}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {isGenerating && (
+        <div className="border-3 border-foreground bg-card p-3 shadow-[4px_4px_0px_0px_var(--foreground)]" role="status" aria-live="polite">
+          <div className="mb-2 flex items-center justify-between text-xs font-bold text-muted-foreground">
+            <span>Agent: {agentMode}</span>
+            <span>{Math.max(5, Math.min(progressValue, 99))}%</span>
+          </div>
+          <div className="h-2.5 border-2 border-foreground bg-muted">
+            <div className="h-full bg-[var(--accent)] transition-all duration-500" style={{ width: `${Math.max(5, Math.min(progressValue, 99))}%` }} />
+          </div>
+          <p className="mt-2 text-sm font-bold text-foreground">{GENERATION_STEPS[activeStep]}</p>
+        </div>
+      )}
+
       {settingsOpen && <SettingsPanel />}
     </div>
   )
@@ -165,6 +230,8 @@ function SettingsPanel() {
     setOllamaUrl,
     ollamaModel,
     setOllamaModel,
+    agentMode,
+    setAgentMode,
   } = useAppStore()
 
   return (
@@ -172,6 +239,23 @@ function SettingsPanel() {
       <h3 className="mb-3 text-xs font-extrabold uppercase tracking-widest text-muted-foreground">
         AI Provider Settings
       </h3>
+
+      <div className="mb-4 grid gap-2 sm:grid-cols-3">
+        {AGENT_OPTIONS.map(({ value, label, hint, icon: Icon }) => (
+          <button
+            key={value}
+            onClick={() => setAgentMode(value)}
+            className={`flex items-center justify-center gap-1.5 border-2 border-foreground px-2 py-2 text-xs font-bold ${
+              agentMode === value ? 'bg-[var(--secondary)]' : 'bg-background hover:bg-muted'
+            }`}
+            title={hint}
+          >
+            <Icon className="size-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
       {aiProvider === 'gemini' ? (
         <div className="flex flex-col gap-2">
           <label htmlFor="gemini-key" className="text-sm font-bold">

@@ -30,24 +30,39 @@ Rules:
 - Export the component as default export.
 - The file should be a complete, self-contained .tsx file.`
 
+
+
+function buildAgentInstruction(agentMode?: string): string {
+  switch (agentMode) {
+    case 'pixel-perfect':
+      return 'Prioritize pixel-perfect visual fidelity above speed. Match spacing, typography, and sizing with maximum precision.'
+    case 'fast':
+      return 'Prioritize response speed while preserving clean and valid output.'
+    default:
+      return 'Balance visual accuracy, clean architecture, and generation speed.'
+  }
+}
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { image, format, provider, geminiApiKey, ollamaUrl } = body
+    const { image, format, provider, geminiApiKey, ollamaUrl, ollamaModel, agentMode } = body
 
     if (!image) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 })
     }
 
-    const systemPrompt =
+    const basePrompt =
       format === 'html' ? SYSTEM_PROMPT_HTML : SYSTEM_PROMPT_NEXTJS
+    const systemPrompt = `${basePrompt}
+
+Agent mode: ${buildAgentInstruction(agentMode)}`
 
     let code: string
 
     if (provider === 'gemini') {
       code = await generateWithGemini(image, systemPrompt, geminiApiKey)
     } else {
-      code = await generateWithOllama(image, systemPrompt, ollamaUrl)
+      code = await generateWithOllama(image, systemPrompt, ollamaUrl, ollamaModel)
     }
 
     // Clean the code - remove markdown code fences if present
@@ -81,16 +96,7 @@ async function generateWithGemini(
   const mimeType = match[1]
   const base64Data = match[2]
 
-  const MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-3.0-flash",
-    "gemini-3.0-pro",
-    "gemini-3.1-flash",
-    "gemini-3.1-pro"
-  ]
+  const MODELS = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
 
   let lastError: any = null
 
@@ -165,7 +171,8 @@ async function generateWithGemini(
 async function generateWithOllama(
   image: string,
   systemPrompt: string,
-  serverUrl: string
+  serverUrl: string,
+  model: string
 ): Promise<string> {
   const url = serverUrl || 'http://localhost:11434'
 
@@ -176,7 +183,7 @@ async function generateWithOllama(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'llava',
+      model: model || 'llava',
       prompt: `${systemPrompt}\n\nConvert this UI screenshot to code. Output ONLY the code, no explanations.`,
       images: [base64Data],
       stream: false,

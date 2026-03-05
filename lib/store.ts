@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 export type ExportFormat = 'html' | 'nextjs'
 export type AIProvider = 'gemini' | 'ollama'
 export type ViewportSize = 'mobile' | 'tablet' | 'desktop'
+export type AgentMode = 'pixel-perfect' | 'balanced' | 'fast'
 
 interface AppState {
   // Image
@@ -29,6 +30,8 @@ interface AppState {
   setOllamaModel: (model: string) => void
   geminiApiKey: string
   setGeminiApiKey: (key: string) => void
+  agentMode: AgentMode
+  setAgentMode: (mode: AgentMode) => void
 
   // Loading
   isGenerating: boolean
@@ -74,6 +77,8 @@ export const useAppStore = create<AppState>()(
       setOllamaModel: (model) => set({ ollamaModel: model }),
       geminiApiKey: '',
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
+      agentMode: 'balanced',
+      setAgentMode: (mode) => set({ agentMode: mode }),
 
       isGenerating: false,
       setIsGenerating: (loading) => set({ isGenerating: loading }),
@@ -107,6 +112,7 @@ export const useAppStore = create<AppState>()(
         ollamaUrl: state.ollamaUrl,
         ollamaModel: state.ollamaModel,
         geminiApiKey: state.geminiApiKey,
+        agentMode: state.agentMode,
       }),
     }
   )
