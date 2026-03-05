@@ -90,12 +90,96 @@ Agent mode: ${buildAgentInstruction(agentMode)}`
       .replace(/```$/gm, '')
       .trim()
 
+    code = normalizeOutputByFormat(code, format)
+
     return NextResponse.json({ code })
   } catch (error: unknown) {
     console.error('Generation error:', error)
     const message = error instanceof Error ? error.message : 'Generation failed'
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+function normalizeOutputByFormat(code: string, format: string): string {
+  if (format === 'html') {
+    return normalizeHtmlOutput(code)
+  }
+
+  return normalizeTsxOutput(code)
+}
+
+function normalizeHtmlOutput(code: string): string {
+  if (!looksLikeTsx(code)) {
+    return code
+  }
+
+  return code
+    .replace(/^import\s+[\s\S]*?from\s+['"][^'"]*['"];?\s*$/gm, '')
+    .replace(/^[\'"]use (client|server)[\'"];?\s*$/gm, '')
+    .replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{/g, '')
+    .replace(/export\s+function\s+\w+\s*\([^)]*\)\s*\{/g, '')
+    .replace(/^\s*return\s*\(\s*$/gm, '')
+    .replace(/^\s*\);\s*$/gm, '')
+    .replace(/className=/g, 'class=')
+    .replace(/\{`([^`]*)`\}/g, '"$1"')
+    .replace(/\{['"]([^'"]*)['"]\}/g, '"$1"')
+    .replace(/^\s*\}\s*$/gm, '')
+    .trim()
+}
+
+function normalizeTsxOutput(code: string): string {
+  if (!looksLikeHtmlDocument(code)) {
+    return code
+  }
+
+  const bodyContent = extractBodyContent(code)
+  const jsxContent = htmlLikeToJsx(bodyContent)
+
+  return `export default function GeneratedComponent() {
+  return (
+    <div className="min-h-screen bg-black text-white">
+${indentLines(jsxContent, 6)}
+    </div>
+  )
+}`
+}
+
+function looksLikeTsx(code: string): boolean {
+  return /(?:^|\n)\s*import\s+/.test(code) || /export\s+default\s+function/.test(code)
+}
+
+function looksLikeHtmlDocument(code: string): boolean {
+  return /<!DOCTYPE\s+html>/i.test(code) || /<html[\s>]/i.test(code)
+}
+
+function extractBodyContent(code: string): string {
+  const bodyMatch = code.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+  if (bodyMatch?.[1]) {
+    return bodyMatch[1].trim()
+  }
+
+  const htmlMatch = code.match(/<html[^>]*>([\s\S]*?)<\/html>/i)
+  if (htmlMatch?.[1]) {
+    return htmlMatch[1].trim()
+  }
+
+  return code
+}
+
+function htmlLikeToJsx(html: string): string {
+  return html
+    .replace(/\sclass=/g, ' className=')
+    .replace(/\sfor=/g, ' htmlFor=')
+    .replace(/<(img|input|br|hr)([^>]*)>/gi, '<$1$2 />')
+    .trim()
+}
+
+function indentLines(text: string, spaces: number): string {
+  const indent = ' '.repeat(spaces)
+  return text
+    .split('\n')
+    .map((line) => (line.trim() ? `${indent}${line}` : ''))
+    .join('\n')
 }
 async function generateWithGemini(
   image: string,
