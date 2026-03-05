@@ -3,6 +3,7 @@
 import { useAppStore, type AgentMode } from '@/lib/store'
 import { Zap, Code2, FileCode2, Bot, Loader2, Sparkles, Gauge, Rocket } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 const GENERATION_STEPS = [
@@ -19,6 +20,7 @@ const AGENT_OPTIONS: { value: AgentMode; label: string; icon: typeof Sparkles; h
 ]
 
 export function Toolbar() {
+  const router = useRouter()
   const {
     uploadedImage,
     exportFormat,
@@ -101,6 +103,15 @@ export function Toolbar() {
       const data = await response.json()
       setProgressValue(100)
       setGeneratedCode(data.code)
+
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('latestGeneratedCode', data.code)
+      }
+
+      setTimeout(() => {
+        router.push('/nextjs-tailwind-typescript')
+      }, 300)
+
       toast.success('Code generated successfully')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Generation failed'
