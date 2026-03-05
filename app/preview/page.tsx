@@ -13,31 +13,57 @@ interface PreviewPayload {
 function PreviewPageContent() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const id = searchParams.get('id')
 
     if (!id) {
       setError('Missing preview id')
+      setLoading(false)
       return
     }
 
-    const payloadRaw = window.localStorage.getItem(`preview-payload-${id}`)
-    if (!payloadRaw) {
-      setError('Preview content not found')
-      return
+    const renderPreview = async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const response = await fetch(`/api/previews/${id}`)
+        if (!response.ok) {
+          setError('Preview content not found')
+          setLoading(false)
+          return
+        }
+
+        const payload = (await response.json()) as PreviewPayload
+        if (!payload?.code || (payload.format !== 'html' && payload.format !== 'nextjs')) {
+          setError('Preview payload is invalid')
+          setLoading(false)
+          return
+        }
+
+        const html = buildPreviewHTML(payload.code, payload.format)
+        document.open()
+        document.write(html)
+        document.close()
+      } catch {
+        setError('Failed to render preview')
+      } finally {
+        setLoading(false)
+      }
     }
 
-    try {
-      const payload = JSON.parse(payloadRaw) as PreviewPayload
-      const html = buildPreviewHTML(payload.code, payload.format)
-      document.open()
-      document.write(html)
-      document.close()
-    } catch {
-      setError('Failed to render preview')
-    }
+    void renderPreview()
   }, [searchParams])
+
+  if (loading && !error) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-4 text-center font-sans">
+        <div className="rounded-lg border border-neutral-300 bg-white p-4 text-sm font-semibold text-neutral-700">Loading preview...</div>
+      </main>
+    )
+  }
 
   if (!error) {
     return null
