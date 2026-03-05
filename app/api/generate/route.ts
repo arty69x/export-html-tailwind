@@ -33,7 +33,8 @@ Rules:
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { image, format, provider, geminiApiKey, ollamaUrl } = body
+    const { image, format, provider, geminiApiKey, ollamaUrl, ollamaModel } =
+      body
 
     if (!image) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 })
@@ -47,7 +48,12 @@ export async function POST(request: NextRequest) {
     if (provider === 'gemini') {
       code = await generateWithGemini(image, systemPrompt, geminiApiKey)
     } else {
-      code = await generateWithOllama(image, systemPrompt, ollamaUrl)
+      code = await generateWithOllama(
+        image,
+        systemPrompt,
+        ollamaUrl,
+        ollamaModel
+      )
     }
 
     // Clean the code - remove markdown code fences if present
@@ -165,9 +171,22 @@ async function generateWithGemini(
 async function generateWithOllama(
   image: string,
   systemPrompt: string,
-  serverUrl: string
+  serverUrl: string,
+  model: string
 ): Promise<string> {
   const url = serverUrl || 'http://localhost:11434'
+
+  if (typeof model !== 'string' || !model.trim()) {
+    throw new Error('Ollama model is required. Please select a valid model.')
+  }
+
+  const normalizedModel = model.trim()
+
+  if (!/^[a-zA-Z0-9._:-]+$/.test(normalizedModel)) {
+    throw new Error(
+      'Invalid Ollama model name. Use only letters, numbers, dot (.), dash (-), underscore (_), or colon (:).'
+    )
+  }
 
   // Extract base64 data
   const base64Data = image.replace(/^data:image\/\w+;base64,/, '')
@@ -176,7 +195,7 @@ async function generateWithOllama(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'llava',
+      model: normalizedModel || 'llava',
       prompt: `${systemPrompt}\n\nConvert this UI screenshot to code. Output ONLY the code, no explanations.`,
       images: [base64Data],
       stream: false,
