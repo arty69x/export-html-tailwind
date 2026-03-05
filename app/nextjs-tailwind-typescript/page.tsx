@@ -1,6 +1,21 @@
-const ACTIONS = ["Export", "Save", "Open Browser"] as const
+"use client"
+
+import { useEffect, useState } from 'react'
+
+const ACTIONS = ['Export', 'Save', 'Open Browser'] as const
 
 export default function NextJsTailwindTypescriptPage() {
+  const [generatedCode, setGeneratedCode] = useState('')
+
+  useEffect(() => {
+    try {
+      const latestCode = window.sessionStorage.getItem('latestGeneratedCode')
+      setGeneratedCode(typeof latestCode === 'string' ? latestCode : '')
+    } catch {
+      setGeneratedCode('')
+    }
+  }, [])
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <section className="py-16 sm:py-20">
@@ -24,7 +39,7 @@ export default function NextJsTailwindTypescriptPage() {
 
             <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
               <pre className="overflow-x-auto text-sm leading-6 text-slate-200">
-                <code>nextjs tailwind typescript.tsx</code>
+                <code>{generatedCode || 'No generated code available.'}</code>
               </pre>
             </div>
           </div>
