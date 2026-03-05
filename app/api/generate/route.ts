@@ -123,6 +123,7 @@ function normalizeHtmlOutput(code: string): string {
     .replace(/className=/g, 'class=')
     .replace(/\{`([^`]*)`\}/g, '"$1"')
     .replace(/\{['"]([^'"]*)['"]\}/g, '"$1"')
+    .replace(/\{[^}]*\}/g, '')
     .replace(/^\s*\}\s*$/gm, '')
     .trim()
 }
@@ -168,8 +169,12 @@ function extractBodyContent(code: string): string {
 
 function htmlLikeToJsx(html: string): string {
   return html
+    .replace(/<\/?(?:!DOCTYPE|html|head|meta|title|link)[^>]*>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/\sclass=/g, ' className=')
     .replace(/\sfor=/g, ' htmlFor=')
+    .replace(/\bon([a-z]+)=['"][^'"]*['"]/gi, '')
     .replace(/<(img|input|br|hr)([^>]*)>/gi, '<$1$2 />')
     .trim()
 }
