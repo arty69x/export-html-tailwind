@@ -1,7 +1,7 @@
 'use client'
 
 import { useAppStore, type ViewportSize } from '@/lib/store'
-import { useRef, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Monitor, Smartphone, Tablet, RefreshCw, ScanLine, Layers } from 'lucide-react'
 
 const viewportWidths: Record<ViewportSize, string> = {
@@ -12,7 +12,6 @@ const viewportWidths: Record<ViewportSize, string> = {
 
 export function PreviewRenderer() {
   const { generatedCode, exportFormat, viewport, setViewport, uploadedImage } = useAppStore()
-  const iframeRef = useRef<HTMLIFrameElement>(null)
   const [previewId, setPreviewId] = useState('')
   const [showOverlay, setShowOverlay] = useState(false)
   const [overlayOpacity, setOverlayOpacity] = useState(45)
@@ -50,15 +49,13 @@ export function PreviewRenderer() {
 
   if (!generatedCode) {
     return (
-      <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-4 p-8 lg:min-h-[400px]">
+      <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-4 p-6 sm:p-8 lg:min-h-[400px]">
         <div className="flex size-14 items-center justify-center border-3 border-foreground bg-[var(--accent)] shadow-[4px_4px_0px_0px_var(--foreground)]">
           <Monitor className="size-7 text-foreground" />
         </div>
         <div className="text-center">
           <p className="text-base font-extrabold text-foreground">No preview yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Generate code first to see the live preview
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Generate code first to see the live preview</p>
         </div>
       </div>
     )
@@ -66,16 +63,16 @@ export function PreviewRenderer() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b-3 border-foreground bg-muted px-3 py-2 lg:px-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b-3 border-foreground bg-muted px-3 py-2 sm:px-4">
         <span className="border-2 border-foreground bg-card px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-muted-foreground lg:text-xs">
           Preview
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-end gap-1">
           {viewportOptions.map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               onClick={() => setViewport(key)}
-              className={`flex min-h-[32px] min-w-[32px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
+              className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
                 viewport === key
                   ? 'bg-[var(--secondary)] text-foreground shadow-[2px_2px_0px_0px_var(--foreground)]'
                   : 'bg-card text-foreground hover:bg-muted'
@@ -86,11 +83,11 @@ export function PreviewRenderer() {
               <Icon className="size-3.5" />
             </button>
           ))}
-          <div className="mx-1 h-5 w-px bg-foreground/20" />
+          <div className="mx-1 hidden h-5 w-px bg-foreground/20 sm:block" />
           <button
             onClick={() => setShowOverlay((prev) => !prev)}
             disabled={!uploadedImage}
-            className={`flex min-h-[32px] min-w-[32px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
+            className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
               showOverlay ? 'bg-[var(--accent)] text-foreground' : 'bg-card text-foreground hover:bg-muted'
             } disabled:cursor-not-allowed disabled:opacity-50`}
             aria-label="Toggle diff overlay"
@@ -101,7 +98,7 @@ export function PreviewRenderer() {
           <button
             onClick={() => setScanEnabled((prev) => !prev)}
             disabled={!showOverlay}
-            className={`flex min-h-[32px] min-w-[32px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
+            className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
               scanEnabled ? 'bg-[var(--secondary)] text-foreground' : 'bg-card text-foreground hover:bg-muted'
             } disabled:cursor-not-allowed disabled:opacity-50`}
             aria-label="Toggle overlay scan"
@@ -111,7 +108,7 @@ export function PreviewRenderer() {
           </button>
           <button
             onClick={renderPreview}
-            className="flex min-h-[32px] min-w-[32px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted"
+            className="flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted"
             aria-label="Refresh preview"
             title="Refresh"
           >
@@ -121,7 +118,7 @@ export function PreviewRenderer() {
       </div>
 
       {showOverlay && uploadedImage && (
-        <div className="flex items-center gap-2 border-b-3 border-foreground bg-card px-3 py-2 text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-2 border-b-3 border-foreground bg-card px-3 py-2 text-xs font-bold sm:px-4">
           <span className="text-muted-foreground">Overlay Opacity</span>
           <input
             type="range"
@@ -129,25 +126,24 @@ export function PreviewRenderer() {
             max={90}
             value={overlayOpacity}
             onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-            className="h-2 w-32 accent-[var(--accent)]"
+            className="h-2 w-full max-w-56 flex-1 accent-[var(--accent)]"
           />
           <span>{overlayOpacity}%</span>
         </div>
       )}
 
-      <div className="flex flex-1 items-start justify-center overflow-auto bg-[#e8e0d0] p-3 lg:p-6">
+      <div className="flex flex-1 items-start justify-center overflow-auto bg-[#e8e0d0] p-2 sm:p-3 lg:p-6">
         <div
-          className="relative h-full transition-all duration-200"
+          className="relative h-full min-h-[260px] transition-all duration-200 sm:min-h-[320px]"
           style={{
             width: viewportWidths[viewport],
             maxWidth: '100%',
           }}
         >
           <iframe
-            ref={iframeRef}
             src={previewUrl}
             title="Live code preview"
-            className="h-full min-h-[300px] w-full border-3 border-foreground bg-white shadow-[6px_6px_0px_0px_var(--foreground)] lg:min-h-[400px]"
+            className="h-full min-h-[260px] w-full border-3 border-foreground bg-white shadow-[4px_4px_0px_0px_var(--foreground)] sm:min-h-[320px] sm:shadow-[6px_6px_0px_0px_var(--foreground)] lg:min-h-[400px]"
             sandbox="allow-scripts"
           />
 
