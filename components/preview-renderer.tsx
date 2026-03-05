@@ -2,7 +2,7 @@
 
 import { buildPreviewHTML } from '@/lib/preview-html'
 import { useAppStore, type ViewportSize } from '@/lib/store'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Monitor, Smartphone, Tablet, RefreshCw, ScanLine, Layers } from 'lucide-react'
 
 const viewportWidths: Record<ViewportSize, string> = {
@@ -33,20 +33,24 @@ export function PreviewRenderer() {
     if (!generatedCode) return
 
     const nextId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    window.localStorage.setItem(
-      `preview-payload-${nextId}`,
-      JSON.stringify({
-        code: generatedCode,
-        format: exportFormat,
-      })
-    )
 
-    setPreviewId(nextId)
-  }
+    try {
+      window.localStorage.setItem(
+        `preview-payload-${nextId}`,
+        JSON.stringify({
+          code: generatedCode,
+          format: exportFormat,
+        })
+      )
+      setPreviewId(nextId)
+    } catch {
+      setPreviewId('')
+    }
+  }, [generatedCode, exportFormat])
 
   useEffect(() => {
     renderPreview()
-  }, [generatedCode, exportFormat])
+  }, [renderPreview])
 
   const viewportOptions: { key: ViewportSize; icon: typeof Monitor; label: string }[] = [
     { key: 'mobile', icon: Smartphone, label: 'Mobile (375px)' },
@@ -104,11 +108,14 @@ export function PreviewRenderer() {
               } disabled:cursor-not-allowed disabled:opacity-40`}
               aria-label={label}
               title={label}
+              type="button"
             >
               <Icon className="size-3.5" />
             </button>
           ))}
+
           <div className="mx-1 hidden h-5 w-px bg-foreground/20 sm:block" />
+
           <button
             onClick={() => setShowOverlay((prev) => !prev)}
             disabled={!uploadedImage || viewMode !== 'preview'}
@@ -117,9 +124,11 @@ export function PreviewRenderer() {
             } disabled:cursor-not-allowed disabled:opacity-50`}
             aria-label="Toggle diff overlay"
             title="Realtime Diff Overlay Preview"
+            type="button"
           >
             <Layers className="size-3.5" />
           </button>
+
           <button
             onClick={() => setScanEnabled((prev) => !prev)}
             disabled={!showOverlay || viewMode !== 'preview'}
@@ -128,15 +137,18 @@ export function PreviewRenderer() {
             } disabled:cursor-not-allowed disabled:opacity-50`}
             aria-label="Toggle overlay scan"
             title="Realtime Overlay Scan"
+            type="button"
           >
             <ScanLine className="size-3.5" />
           </button>
+
           <button
             onClick={renderPreview}
             disabled={viewMode !== 'preview'}
             className="flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted"
             aria-label="Refresh preview"
             title="Refresh"
+            type="button"
           >
             <RefreshCw className="size-3.5" />
           </button>
