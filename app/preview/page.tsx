@@ -17,7 +17,6 @@ function PreviewPageContent() {
 
   useEffect(() => {
     let isMounted = true
-    const controller = new AbortController()
     const id = searchParams.get('id')
 
     if (!id) {
@@ -28,15 +27,19 @@ function PreviewPageContent() {
 
     const renderPreview = async () => {
       try {
-        const response = await fetch(`/api/previews/${id}`)
+        const response = await fetch(`/api/previews/${id}`, { cache: 'no-store' })
         if (!response.ok) {
-          setError('Preview content not found')
+          if (isMounted) {
+            setError('Preview content not found')
+          }
           return
         }
 
         const payload = (await response.json()) as PreviewPayload
         if (!payload?.code || (payload.format !== 'html' && payload.format !== 'nextjs')) {
-          setError('Preview payload is invalid')
+          if (isMounted) {
+            setError('Preview payload is invalid')
+          }
           return
         }
 
@@ -45,17 +48,29 @@ function PreviewPageContent() {
         document.write(html)
         document.close()
       } catch {
-        setError('Failed to render preview')
+        if (isMounted) {
+          setError('Failed to render preview')
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
-    renderPreview()
+    void renderPreview()
+
+    return () => {
+      isMounted = false
+    }
   }, [searchParams])
 
   if (loading && !error) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-4 text-center font-sans">
-        <div className="rounded-lg border border-neutral-300 bg-white p-4 text-sm font-semibold text-neutral-700">Loading preview...</div>
+        <div className="rounded-lg border border-neutral-300 bg-white p-4 text-sm font-semibold text-neutral-700">
+          Loading preview...
+        </div>
       </main>
     )
   }
