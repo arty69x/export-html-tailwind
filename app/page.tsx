@@ -1,125 +1,143 @@
 'use client'
 
-import { Header } from '@/components/header'
-import { ImageUpload } from '@/components/image-upload'
-import { CodeEditor } from '@/components/code-editor'
-import { PreviewRenderer } from '@/components/preview-renderer'
-import { Toolbar } from '@/components/toolbar'
-import { useAppStore } from '@/lib/store'
-import { Code2, Eye } from 'lucide-react'
+import { ChangeEvent, useMemo, useState } from 'react'
+import CodeViewer from '@/components/code-viewer'
+import PreviewRenderer from '@/components/preview-renderer'
+import { getCode, setCode, type GeneratedCode } from '@/lib/code-store'
+
+function fileToDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+        return
+      }
+
+      reject(new Error('Invalid image format'))
+    }
+
+    reader.onerror = () => reject(new Error('Failed to read image file'))
+    reader.readAsDataURL(file)
+  })
+}
 
 export default function Home() {
-  const { activePanel, setActivePanel, generatedCode } = useAppStore()
+  const [code, setCodeState] = useState<GeneratedCode>(getCode())
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [imageDataUrl, setImageDataUrl] = useState('')
+
+  const displayCode = useMemo(() => {
+    if (code.tsx) return code.tsx
+    if (code.html) return code.html
+    return ''
+  }, [code.html, code.tsx])
+
+  async function onImageChange(event: ChangeEvent<HTMLInputElement>) {
+    setError('')
+
+    try {
+      const files = event.target.files
+      if (!files || files.length === 0) {
+        setImageDataUrl('')
+        return
+      }
+
+      const imageFile = files[0]
+      const image = await fileToDataURL(imageFile)
+      setImageDataUrl(image)
+    } catch {
+      setImageDataUrl('')
+      setError('Cannot read uploaded image')
+    }
+  }
+
+  async function generate() {
+    if (!imageDataUrl) {
+      setError('Please upload a screenshot first')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image: imageDataUrl }),
+      })
+
+      const rawText = await res.text()
+      let data: Partial<GeneratedCode> & { error?: string } = {}
+
+      try {
+        data = JSON.parse(rawText) as Partial<GeneratedCode> & { error?: string }
+      } catch {
+        setError('Invalid API response')
+        return
+      }
+
+      if (!res.ok) {
+        setError(data.error ?? 'Generation failed')
+        return
+      }
+
+      const nextCode: GeneratedCode = {
+        html: typeof data.html === 'string' ? data.html : '',
+        tsx: typeof data.tsx === 'string' ? data.tsx : '',
+        tailwind: typeof data.tailwind === 'string' ? data.tailwind : '',
+      }
+
+      setCode(nextCode)
+      setCodeState(nextCode)
+    } catch {
+      setError('Generation failed')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <Header />
+    <main>
+      <section>
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={onImageChange}
+              className="block w-full rounded border p-2 text-sm"
+              aria-label="Upload screenshot"
+            />
 
-      <main className="flex flex-1 flex-col">
-        {/* Toolbar */}
-        <section className="border-b-3 border-foreground bg-background px-4 py-3 sm:px-6 sm:py-4">
-          <Toolbar />
-        </section>
+            <button
+              onClick={() => void generate()}
+              disabled={loading || !imageDataUrl}
+              className="rounded bg-black px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+            >
+              {loading ? 'Generating...' : 'Generate'}
+            </button>
+          </div>
 
-        {/* Main Content */}
-        <div className="flex flex-1 flex-col lg:flex-row">
-          {/* Left Panel - Image Upload */}
-          <aside className="w-full border-b-3 border-foreground bg-background p-4 sm:p-6 lg:w-[400px] lg:border-b-0 lg:border-r-3">
-            <h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              <span className="inline-flex size-6 items-center justify-center border-2 border-foreground bg-[var(--secondary)] text-xs font-bold text-foreground">
-                1
-              </span>
-              Upload Screenshot
-            </h2>
-            <ImageUpload />
+          {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
 
-            {/* Quick Info */}
-            <div className="mt-4 rounded-md border border-border bg-muted/40 p-4">
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wider">How it works</h3>
-              <ol className="space-y-2 text-xs text-muted-foreground">
-                <li className="flex gap-2">
-                  <span className="inline-flex size-5 shrink-0 items-center justify-center border-2 border-foreground bg-[var(--secondary)] text-[10px] font-bold text-foreground">1</span>
-                  Upload a UI screenshot or mockup
-                </li>
-                <li className="flex gap-2">
-                  <span className="inline-flex size-5 shrink-0 items-center justify-center border-2 border-foreground bg-[var(--secondary)] text-[10px] font-bold text-foreground">2</span>
-                  Choose export format and AI provider
-                </li>
-                <li className="flex gap-2">
-                  <span className="inline-flex size-5 shrink-0 items-center justify-center border-2 border-foreground bg-[var(--secondary)] text-[10px] font-bold text-foreground">3</span>
-                  Click Generate to get production code
-                </li>
-                <li className="flex gap-2">
-                  <span className="inline-flex size-5 shrink-0 items-center justify-center border-2 border-foreground bg-[var(--accent)] text-[10px] font-bold text-foreground">4</span>
-                  Preview, edit, and export your code
-                </li>
-              </ol>
-            </div>
-          </aside>
-
-          {/* Right Panel - Code / Preview */}
-          <div className="flex flex-1 flex-col">
-            {/* Tab Switcher */}
-            <div className="flex border-b-3 border-foreground bg-muted">
-              <button
-                onClick={() => setActivePanel('code')}
-                className={`flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-bold transition-colors sm:px-6 ${
-                  activePanel === 'code'
-                    ? 'border-b-2 border-[var(--secondary)] bg-card text-foreground'
-                    : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
-                }`}
-                aria-selected={activePanel === 'code'}
-                role="tab"
-              >
-                <Code2 className="size-4" />
-                <span className="hidden sm:inline">Code Editor</span>
-                <span className="sm:hidden">Code</span>
-                {generatedCode && (
-                  <span className="inline-flex size-2 rounded-full bg-[var(--accent)]" />
-                )}
-              </button>
-              <button
-                onClick={() => setActivePanel('preview')}
-                className={`flex flex-1 items-center justify-center gap-2 border-l-3 border-foreground px-4 py-3 text-sm font-bold transition-colors sm:px-6 ${
-                  activePanel === 'preview'
-                    ? 'border-b-2 border-[var(--secondary)] bg-card text-foreground'
-                    : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
-                }`}
-                aria-selected={activePanel === 'preview'}
-                role="tab"
-              >
-                <Eye className="size-4" />
-                <span className="hidden sm:inline">Live Preview</span>
-                <span className="sm:hidden">Preview</span>
-              </button>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="h-[600px] rounded border">
+              <PreviewRenderer html={code.html} />
             </div>
 
-            {/* Tab Content */}
-            <div className="flex-1">
-              {activePanel === 'code' ? <CodeEditor /> : <PreviewRenderer />}
+            <div className="h-[600px] rounded border">
+              <CodeViewer code={displayCode} />
             </div>
           </div>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t-3 border-foreground bg-card px-4 py-3 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
-          <span>
-            PixelForge — Next.js 16 / Tailwind 4 / TypeScript
-          </span>
-          <span className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1">
-              <span className="size-2 rounded-full bg-[var(--accent)]" />
-              Gemini
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="size-2 rounded-full bg-[var(--secondary)]" />
-              Ollama
-            </span>
-          </span>
-        </div>
-      </footer>
-    </div>
+      </section>
+    </main>
   )
 }
