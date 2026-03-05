@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { buildPreviewHTML } from '@/lib/preview-html'
 import { useAppStore, type ViewportSize } from '@/lib/store'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -27,11 +26,10 @@ export function PreviewRenderer() {
 
   const renderedDocument = useMemo(() => {
     if (!generatedCode) return ''
-
     return buildPreviewHTML(generatedCode, exportFormat)
-  }, [generatedCode, exportFormat])
+  }, [exportFormat, generatedCode])
 
-  const renderPreview = useCallback(() => {
+  const renderPreview = () => {
     if (!generatedCode) return
 
     const nextId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -84,7 +82,6 @@ export function PreviewRenderer() {
               viewMode === 'preview' ? 'bg-card text-foreground' : 'bg-background text-muted-foreground hover:bg-card'
             }`}
             aria-pressed={viewMode === 'preview'}
-            type="button"
           >
             Preview
           </button>
@@ -94,12 +91,10 @@ export function PreviewRenderer() {
               viewMode === 'rendered' ? 'bg-card text-foreground' : 'bg-background text-muted-foreground hover:bg-card'
             }`}
             aria-pressed={viewMode === 'rendered'}
-            type="button"
           >
             Rendered
           </button>
         </div>
-
         <div className="flex flex-wrap items-center justify-end gap-1">
           {viewportOptions.map(({ key, icon: Icon, label }) => (
             <button
@@ -107,7 +102,9 @@ export function PreviewRenderer() {
               onClick={() => setViewport(key)}
               disabled={viewMode !== 'preview'}
               className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
-                viewport === key ? 'bg-[var(--secondary)]/30 text-foreground' : 'bg-card text-foreground hover:bg-muted'
+                viewport === key
+                  ? 'bg-[var(--secondary)]/30 text-foreground'
+                  : 'bg-card text-foreground hover:bg-muted'
               } disabled:cursor-not-allowed disabled:opacity-40`}
               aria-label={label}
               title={label}
@@ -148,7 +145,7 @@ export function PreviewRenderer() {
           <button
             onClick={renderPreview}
             disabled={viewMode !== 'preview'}
-            className="flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted"
             aria-label="Refresh preview"
             title="Refresh"
             type="button"
@@ -191,29 +188,22 @@ export function PreviewRenderer() {
 
             {showOverlay && uploadedImage && (
               <>
-                <Image
+                <img
                   src={uploadedImage}
                   alt="Overlay reference"
-                  fill
-                  unoptimized
                   className="pointer-events-none absolute inset-0 h-full w-full border-3 border-transparent object-contain mix-blend-difference"
                   style={{ opacity: overlayOpacity / 100 }}
                 />
-                {scanEnabled && (
-                  <div className="overlay-scan-line pointer-events-none absolute left-0 right-0 h-0.5 bg-red-500/90" />
-                )}
+                {scanEnabled && <div className="overlay-scan-line pointer-events-none absolute left-0 right-0 h-0.5 bg-red-500/90" />}
               </>
             )}
           </div>
         </div>
       ) : (
         <div className="relative flex flex-1 bg-[#151515]">
-          <iframe
-            srcDoc={renderedDocument}
-            title="Rendered document output"
-            className="h-full min-h-[260px] w-full border-0 bg-white sm:min-h-[320px] lg:min-h-[400px]"
-            sandbox="allow-scripts"
-          />
+          <pre className="h-full min-h-[260px] w-full overflow-auto p-4 font-mono text-xs leading-5 text-[#9ee493] sm:min-h-[320px] lg:min-h-[400px]">
+            <code>{renderedDocument}</code>
+          </pre>
         </div>
       )}
     </div>
