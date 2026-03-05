@@ -1,8 +1,8 @@
 'use client'
 
 import { useAppStore, type ViewportSize } from '@/lib/store'
-import { useRef, useEffect, useCallback } from 'react'
-import { Monitor, Smartphone, Tablet, RefreshCw, Maximize2 } from 'lucide-react'
+import { useRef, useEffect, useMemo, useState } from 'react'
+import { Monitor, Smartphone, Tablet, RefreshCw, ScanLine, Layers } from 'lucide-react'
 
 const viewportWidths: Record<ViewportSize, string> = {
   mobile: '375px',
@@ -11,84 +11,36 @@ const viewportWidths: Record<ViewportSize, string> = {
 }
 
 export function PreviewRenderer() {
-  const { generatedCode, exportFormat, viewport, setViewport } = useAppStore()
+  const { generatedCode, exportFormat, viewport, setViewport, uploadedImage } = useAppStore()
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [previewId, setPreviewId] = useState('')
+  const [showOverlay, setShowOverlay] = useState(false)
+  const [overlayOpacity, setOverlayOpacity] = useState(45)
+  const [scanEnabled, setScanEnabled] = useState(false)
 
-  const buildPreviewHTML = useCallback(
-    (code: string): string => {
-      if (exportFormat === 'html') {
-        // If it already has <html> or <body>, use as-is
-        if (code.includes('<html') || code.includes('<!DOCTYPE')) {
-          return code
-        }
-        // Wrap in a basic HTML shell with Tailwind CDN
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com"><\/script>
-  <style>body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }</style>
-</head>
-<body>${code}</body>
-</html>`
-      }
+  const previewUrl = useMemo(() => {
+    if (!previewId) return 'about:blank'
+    return `/preview?id=${previewId}`
+  }, [previewId])
 
-      // For Next.js/TSX: strip React/TS-specific syntax and render as HTML
-      let htmlContent = code
-        // Remove import statements
-        .replace(/^import\s+[\s\S]*?from\s+['"][^'"]*['"];?\s*$/gm, '')
-        // Remove 'use client' / 'use server'
-        .replace(/^['"]use (client|server)['"];?\s*$/gm, '')
-        // Remove export default function ... { and closing }
-        .replace(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{/g, '')
-        // Remove export function
-        .replace(/export\s+function\s+\w+\s*\([^)]*\)\s*\{/g, '')
-        // Remove leading return (
-        .replace(/^\s*return\s*\(\s*$/gm, '')
-        // Remove trailing ); }
-        .replace(/^\s*\);\s*$/gm, '')
-        // Replace className with class
-        .replace(/className=/g, 'class=')
-        // Handle template literals in attributes {`...`}
-        .replace(/\{`([^`]*)`\}/g, '"$1"')
-        // Handle simple string expressions {'...'} or {"..."}
-        .replace(/\{['"]([^'"]*)['"]\}/g, '"$1"')
-        // Remove remaining JSX expressions like {variable}
-        .replace(/\{[^}]*\}/g, '')
-        // Clean up any orphaned braces
-        .replace(/^\s*\}\s*$/gm, '')
-        .trim()
+  const renderPreview = () => {
+    if (!generatedCode) return
 
-      return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com"><\/script>
-  <style>body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }</style>
-</head>
-<body>
-  <div id="root">${htmlContent}</div>
-</body>
-</html>`
-    },
-    [exportFormat]
-  )
+    const nextId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    window.localStorage.setItem(
+      `preview-payload-${nextId}`,
+      JSON.stringify({
+        code: generatedCode,
+        format: exportFormat,
+      })
+    )
 
-  const renderPreview = useCallback(() => {
-    if (!iframeRef.current || !generatedCode) return
-    const doc = iframeRef.current.contentDocument
-    if (!doc) return
-    const html = buildPreviewHTML(generatedCode)
-    doc.open()
-    doc.write(html)
-    doc.close()
-  }, [generatedCode, buildPreviewHTML])
+    setPreviewId(nextId)
+  }
 
   useEffect(() => {
     renderPreview()
-  }, [renderPreview])
+  }, [generatedCode, exportFormat])
 
   const viewportOptions: { key: ViewportSize; icon: typeof Monitor; label: string }[] = [
     { key: 'mobile', icon: Smartphone, label: 'Mobile (375px)' },
@@ -114,7 +66,6 @@ export function PreviewRenderer() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Preview toolbar */}
       <div className="flex items-center justify-between border-b-3 border-foreground bg-muted px-3 py-2 lg:px-4">
         <span className="border-2 border-foreground bg-card px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-muted-foreground lg:text-xs">
           Preview
@@ -137,6 +88,28 @@ export function PreviewRenderer() {
           ))}
           <div className="mx-1 h-5 w-px bg-foreground/20" />
           <button
+            onClick={() => setShowOverlay((prev) => !prev)}
+            disabled={!uploadedImage}
+            className={`flex min-h-[32px] min-w-[32px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
+              showOverlay ? 'bg-[var(--accent)] text-foreground' : 'bg-card text-foreground hover:bg-muted'
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+            aria-label="Toggle diff overlay"
+            title="Realtime Diff Overlay Preview"
+          >
+            <Layers className="size-3.5" />
+          </button>
+          <button
+            onClick={() => setScanEnabled((prev) => !prev)}
+            disabled={!showOverlay}
+            className={`flex min-h-[32px] min-w-[32px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
+              scanEnabled ? 'bg-[var(--secondary)] text-foreground' : 'bg-card text-foreground hover:bg-muted'
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+            aria-label="Toggle overlay scan"
+            title="Realtime Overlay Scan"
+          >
+            <ScanLine className="size-3.5" />
+          </button>
+          <button
             onClick={renderPreview}
             className="flex min-h-[32px] min-w-[32px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted"
             aria-label="Refresh preview"
@@ -147,10 +120,24 @@ export function PreviewRenderer() {
         </div>
       </div>
 
-      {/* Preview iframe */}
+      {showOverlay && uploadedImage && (
+        <div className="flex items-center gap-2 border-b-3 border-foreground bg-card px-3 py-2 text-xs font-bold">
+          <span className="text-muted-foreground">Overlay Opacity</span>
+          <input
+            type="range"
+            min={10}
+            max={90}
+            value={overlayOpacity}
+            onChange={(e) => setOverlayOpacity(Number(e.target.value))}
+            className="h-2 w-32 accent-[var(--accent)]"
+          />
+          <span>{overlayOpacity}%</span>
+        </div>
+      )}
+
       <div className="flex flex-1 items-start justify-center overflow-auto bg-[#e8e0d0] p-3 lg:p-6">
         <div
-          className="h-full transition-all duration-200"
+          className="relative h-full transition-all duration-200"
           style={{
             width: viewportWidths[viewport],
             maxWidth: '100%',
@@ -158,10 +145,23 @@ export function PreviewRenderer() {
         >
           <iframe
             ref={iframeRef}
+            src={previewUrl}
             title="Live code preview"
             className="h-full min-h-[300px] w-full border-3 border-foreground bg-white shadow-[6px_6px_0px_0px_var(--foreground)] lg:min-h-[400px]"
             sandbox="allow-scripts"
           />
+
+          {showOverlay && uploadedImage && (
+            <>
+              <img
+                src={uploadedImage}
+                alt="Overlay reference"
+                className="pointer-events-none absolute inset-0 h-full w-full border-3 border-transparent object-contain mix-blend-difference"
+                style={{ opacity: overlayOpacity / 100 }}
+              />
+              {scanEnabled && <div className="overlay-scan-line pointer-events-none absolute left-0 right-0 h-0.5 bg-red-500/90" />}
+            </>
+          )}
         </div>
       </div>
     </div>
