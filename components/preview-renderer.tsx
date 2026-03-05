@@ -1,9 +1,9 @@
 'use client'
 
-import Image from 'next/image'
-import { useAppStore, type ExportFormat, type ViewportSize } from '@/lib/store'
+import { buildPreviewHTML } from '@/lib/preview-html'
+import { useAppStore, type ViewportSize } from '@/lib/store'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Monitor, Smartphone, Tablet, RefreshCw, ScanLine, Layers, History } from 'lucide-react'
+import { Monitor, Smartphone, Tablet, RefreshCw, ScanLine, Layers } from 'lucide-react'
 
 const viewportWidths: Record<ViewportSize, string> = {
   mobile: '375px',
@@ -26,9 +26,6 @@ export function PreviewRenderer() {
   const [scanEnabled, setScanEnabled] = useState(false)
   const [historyItems, setHistoryItems] = useState<PreviewHistoryItem[]>([])
   const [selectedHistoryId, setSelectedHistoryId] = useState('')
-  const [historyLoading, setHistoryLoading] = useState(false)
-  const [historyError, setHistoryError] = useState<string | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
 
   const previewUrl = useMemo(() => {
     const currentId = previewId || selectedHistoryId
@@ -42,7 +39,7 @@ export function PreviewRenderer() {
     return `/preview?id=${selectedHistoryId}`
   }, [selectedHistoryId])
 
-  const loadHistory = useCallback(async (): Promise<PreviewHistoryItem[]> => {
+  const loadHistory = useCallback(async () => {
     setHistoryLoading(true)
     setHistoryError(null)
 
@@ -52,7 +49,7 @@ export function PreviewRenderer() {
         setHistoryItems([])
         setSelectedHistoryId('')
         setHistoryError('Failed to load history')
-        return []
+        return
       }
 
       const data = (await response.json()) as { history?: unknown }
@@ -62,7 +59,7 @@ export function PreviewRenderer() {
         setHistoryItems([])
         setSelectedHistoryId('')
         setHistoryError('History payload is invalid')
-        return []
+        return
       }
 
       const nextItems = rawHistory.filter((item): item is PreviewHistoryItem => {
@@ -76,7 +73,10 @@ export function PreviewRenderer() {
         )
       })
 
-      setHistoryItems(nextItems)
+  const renderedDocument = useMemo(() => {
+    if (!generatedCode) return ''
+    return buildPreviewHTML(generatedCode, exportFormat)
+  }, [exportFormat, generatedCode])
 
       if (nextItems.length === 0) {
         setSelectedHistoryId('')
@@ -102,53 +102,24 @@ export function PreviewRenderer() {
   const renderPreview = useCallback(async () => {
     if (!generatedCode) return
 
-    setPreviewLoading(true)
+    const nextId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
     try {
-      const response = await fetch('/api/previews', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      window.localStorage.setItem(
+        `preview-payload-${nextId}`,
+        JSON.stringify({
           code: generatedCode,
           format: exportFormat,
-        }),
-      })
-
-      if (!response.ok) {
-        return
-      }
-
-      const data = (await response.json()) as Partial<PreviewHistoryItem>
-      if (typeof data.id !== 'string') {
-        return
-      }
-
-      const updatedHistory = await loadHistory()
-
-      const hasCurrentId = updatedHistory.some((item) => item.id === data.id)
-      const nextSelectedId = hasCurrentId
-        ? data.id
-        : updatedHistory.length > 0
-          ? updatedHistory[0].id
-          : data.id
-
-      setPreviewId(data.id)
-      setSelectedHistoryId(nextSelectedId)
+        })
+      )
+      setPreviewId(nextId)
     } catch {
-      // no-op: keep previous preview id so existing preview is still usable
-    } finally {
-      setPreviewLoading(false)
+      setPreviewId('')
     }
-  }, [generatedCode, exportFormat, loadHistory])
+  }, [generatedCode, exportFormat])
 
   useEffect(() => {
-    void loadHistory()
-  }, [loadHistory])
-
-  useEffect(() => {
-    void renderPreview()
+    renderPreview()
   }, [renderPreview])
 
   const viewportOptions: { key: ViewportSize; icon: typeof Monitor; label: string }[] = [
@@ -191,12 +162,10 @@ export function PreviewRenderer() {
               viewMode === 'rendered' ? 'bg-card text-foreground' : 'bg-background text-muted-foreground hover:bg-card'
             }`}
             aria-pressed={viewMode === 'rendered'}
-            type="button"
           >
             Rendered
           </button>
         </div>
-
         <div className="flex flex-wrap items-center justify-end gap-1">
           {viewportOptions.map(({ key, icon: Icon, label }) => (
             <button
@@ -204,7 +173,9 @@ export function PreviewRenderer() {
               onClick={() => setViewport(key)}
               disabled={viewMode !== 'preview'}
               className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
-                viewport === key ? 'bg-[var(--secondary)]/30 text-foreground' : 'bg-card text-foreground hover:bg-muted'
+                viewport === key
+                  ? 'bg-[var(--secondary)]/30 text-foreground'
+                  : 'bg-card text-foreground hover:bg-muted'
               } disabled:cursor-not-allowed disabled:opacity-40`}
               aria-label={label}
               title={label}
@@ -243,11 +214,9 @@ export function PreviewRenderer() {
           </button>
 
           <button
-            onClick={() => {
-              void renderPreview()
-            }}
-            disabled={viewMode !== 'preview' || previewLoading}
-            className="flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={renderPreview}
+            disabled={viewMode !== 'preview'}
+            className="flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground bg-card p-1.5 transition-all hover:bg-muted"
             aria-label="Refresh preview"
             title="Refresh"
             type="button"
@@ -256,29 +225,6 @@ export function PreviewRenderer() {
           </button>
         </div>
       </div>
-
-      {viewMode === 'rendered' && (
-        <div className="flex flex-col gap-2 border-b-3 border-foreground bg-card px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-            <History className="size-3.5" />
-            <span>History</span>
-            {historyLoading && <span className="text-[10px]">Loading...</span>}
-          </div>
-          <select
-            value={selectedHistoryId}
-            onChange={(event) => setSelectedHistoryId(event.target.value)}
-            className="w-full max-w-[280px] border-2 border-foreground bg-white px-2 py-1 text-xs font-bold text-foreground outline-none"
-          >
-            {historyItems.length === 0 && <option value="">No history</option>}
-            {historyItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                {new Date(item.createdAt).toLocaleString()} • {item.format.toUpperCase()}
-              </option>
-            ))}
-          </select>
-          {historyError && <p className="text-[10px] font-bold text-red-600">{historyError}</p>}
-        </div>
-      )}
 
       {viewMode === 'preview' && showOverlay && uploadedImage && (
         <div className="flex flex-wrap items-center gap-2 border-b-3 border-foreground bg-card px-3 py-2 text-xs font-bold sm:px-4">
@@ -313,29 +259,22 @@ export function PreviewRenderer() {
 
             {showOverlay && uploadedImage && (
               <>
-                <Image
+                <img
                   src={uploadedImage}
                   alt="Overlay reference"
-                  fill
-                  unoptimized
                   className="pointer-events-none absolute inset-0 h-full w-full border-3 border-transparent object-contain mix-blend-difference"
                   style={{ opacity: overlayOpacity / 100 }}
                 />
-                {scanEnabled && (
-                  <div className="overlay-scan-line pointer-events-none absolute left-0 right-0 h-0.5 bg-red-500/90" />
-                )}
+                {scanEnabled && <div className="overlay-scan-line pointer-events-none absolute left-0 right-0 h-0.5 bg-red-500/90" />}
               </>
             )}
           </div>
         </div>
       ) : (
-        <div className="relative flex flex-1 bg-[#e8e0d0] p-2 sm:p-3 lg:p-6">
-          <iframe
-            src={selectedHistoryUrl}
-            title="Rendered history preview"
-            className="h-full min-h-[260px] w-full border-3 border-foreground bg-white shadow-[4px_4px_0px_0px_var(--foreground)] sm:min-h-[320px] sm:shadow-[6px_6px_0px_0px_var(--foreground)] lg:min-h-[400px]"
-            sandbox="allow-scripts"
-          />
+        <div className="relative flex flex-1 bg-[#151515]">
+          <pre className="h-full min-h-[260px] w-full overflow-auto p-4 font-mono text-xs leading-5 text-[#9ee493] sm:min-h-[320px] lg:min-h-[400px]">
+            <code>{renderedDocument}</code>
+          </pre>
         </div>
       )}
     </div>

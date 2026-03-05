@@ -26,59 +26,30 @@ function PreviewPageContent() {
       return
     }
 
-    const renderPreview = async (previewId: string) => {
-      if (!isMounted) return
-
-      setLoading(true)
-      setError(null)
-
+    const renderPreview = async () => {
       try {
-        const response = await fetch(`/api/previews/${previewId}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        })
-
-        if (!isMounted) return
-
+        const response = await fetch(`/api/previews/${id}`)
         if (!response.ok) {
           setError('Preview content not found')
-          setLoading(false)
           return
         }
 
         const payload = (await response.json()) as PreviewPayload
-        if (!isMounted) return
-
         if (!payload?.code || (payload.format !== 'html' && payload.format !== 'nextjs')) {
           setError('Preview payload is invalid')
-          setLoading(false)
           return
         }
 
-        const htmlString = buildPreviewHTML(payload.code, payload.format)
-        if (!isMounted) return
-
+        const html = buildPreviewHTML(payload.code, payload.format)
         document.open()
-        document.write(htmlString)
+        document.write(html)
         document.close()
-
-        setLoading(false)
       } catch {
-        if (!isMounted || controller.signal.aborted) {
-          return
-        }
-
         setError('Failed to render preview')
-        setLoading(false)
       }
     }
 
-    void renderPreview(id)
-
-    return () => {
-      isMounted = false
-      controller.abort()
-    }
+    renderPreview()
   }, [searchParams])
 
   if (loading && !error) {
