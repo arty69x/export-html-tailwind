@@ -1,7 +1,9 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export type ExportFormat = 'html' | 'nextjs'
 export type AIProvider = 'gemini' | 'ollama'
+export type ViewportSize = 'mobile' | 'tablet' | 'desktop'
 
 interface AppState {
   // Image
@@ -23,40 +25,89 @@ interface AppState {
   setAIProvider: (provider: AIProvider) => void
   ollamaUrl: string
   setOllamaUrl: (url: string) => void
+  ollamaModel: string
+  setOllamaModel: (model: string) => void
   geminiApiKey: string
   setGeminiApiKey: (key: string) => void
 
   // Loading
   isGenerating: boolean
   setIsGenerating: (loading: boolean) => void
+  generationError: string | null
+  setGenerationError: (error: string | null) => void
 
-  // Active tab
-  activeTab: 'code' | 'preview'
-  setActiveTab: (tab: 'code' | 'preview') => void
+  // Active panel
+  activePanel: 'code' | 'preview'
+  setActivePanel: (panel: 'code' | 'preview') => void
+
+  // Preview viewport
+  viewport: ViewportSize
+  setViewport: (size: ViewportSize) => void
+
+  // Settings open
+  settingsOpen: boolean
+  setSettingsOpen: (open: boolean) => void
+
+  // Reset
+  reset: () => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  uploadedImage: null,
-  imageFile: null,
-  setUploadedImage: (img) => set({ uploadedImage: img }),
-  setImageFile: (file) => set({ imageFile: file }),
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      uploadedImage: null,
+      imageFile: null,
+      setUploadedImage: (img) => set({ uploadedImage: img }),
+      setImageFile: (file) => set({ imageFile: file }),
 
-  generatedCode: '',
-  setGeneratedCode: (code) => set({ generatedCode: code }),
+      generatedCode: '',
+      setGeneratedCode: (code) => set({ generatedCode: code }),
 
-  exportFormat: 'nextjs',
-  setExportFormat: (format) => set({ exportFormat: format }),
+      exportFormat: 'nextjs',
+      setExportFormat: (format) => set({ exportFormat: format }),
 
-  aiProvider: 'gemini',
-  setAIProvider: (provider) => set({ aiProvider: provider }),
-  ollamaUrl: 'http://localhost:11434',
-  setOllamaUrl: (url) => set({ ollamaUrl: url }),
-  geminiApiKey: '',
-  setGeminiApiKey: (key) => set({ geminiApiKey: key }),
+      aiProvider: 'gemini',
+      setAIProvider: (provider) => set({ aiProvider: provider }),
+      ollamaUrl: 'http://localhost:11434',
+      setOllamaUrl: (url) => set({ ollamaUrl: url }),
+      ollamaModel: 'llava',
+      setOllamaModel: (model) => set({ ollamaModel: model }),
+      geminiApiKey: '',
+      setGeminiApiKey: (key) => set({ geminiApiKey: key }),
 
-  isGenerating: false,
-  setIsGenerating: (loading) => set({ isGenerating: loading }),
+      isGenerating: false,
+      setIsGenerating: (loading) => set({ isGenerating: loading }),
+      generationError: null,
+      setGenerationError: (error) => set({ generationError: error }),
 
-  activeTab: 'code',
-  setActiveTab: (tab) => set({ activeTab: tab }),
-}))
+      activePanel: 'code',
+      setActivePanel: (panel) => set({ activePanel: panel }),
+
+      viewport: 'desktop',
+      setViewport: (size) => set({ viewport: size }),
+
+      settingsOpen: false,
+      setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+      reset: () =>
+        set({
+          uploadedImage: null,
+          imageFile: null,
+          generatedCode: '',
+          isGenerating: false,
+          generationError: null,
+          activePanel: 'code',
+        }),
+    }),
+    {
+      name: 'pixelforge-settings',
+      partialize: (state) => ({
+        exportFormat: state.exportFormat,
+        aiProvider: state.aiProvider,
+        ollamaUrl: state.ollamaUrl,
+        ollamaModel: state.ollamaModel,
+        geminiApiKey: state.geminiApiKey,
+      }),
+    }
+  )
+)

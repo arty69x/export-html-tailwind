@@ -1,45 +1,49 @@
 'use client'
 
-import { Hammer, Github, Globe } from 'lucide-react'
+import { Hammer, Settings2, RotateCcw } from 'lucide-react'
+import { useAppStore } from '@/lib/store'
 
 export function Header() {
+  const { settingsOpen, setSettingsOpen, reset } = useAppStore()
+
   return (
-    <header className="flex items-center justify-between border-b-3 border-foreground bg-card px-6 py-3">
+    <header className="flex items-center justify-between border-b-3 border-foreground bg-card px-4 py-3 lg:px-6">
       <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center border-3 border-foreground bg-[var(--secondary)] shadow-[3px_3px_0px_0px_var(--foreground)]">
-          <Hammer className="size-5 text-foreground" />
+        <div className="flex size-10 items-center justify-center border-3 border-foreground bg-[var(--secondary)] shadow-[4px_4px_0px_0px_var(--foreground)]">
+          <Hammer className="size-5 text-foreground" strokeWidth={2.5} />
         </div>
         <div>
-          <h1 className="text-xl font-bold leading-none tracking-tight text-foreground">
+          <h1 className="text-balance text-lg font-extrabold leading-none tracking-tight text-foreground lg:text-xl">
             PixelForge
           </h1>
           <p className="text-xs font-bold text-muted-foreground">
-            Image to Code Converter
+            Screenshot to Code
           </p>
         </div>
       </div>
-      <nav className="flex items-center gap-2">
-        <a
-          href="https://github.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="border-2 border-foreground bg-card p-2 transition-all shadow-[2px_2px_0px_0px_var(--foreground)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_var(--foreground)]"
-          aria-label="GitHub"
-          title="GitHub"
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={reset}
+          className="flex size-10 items-center justify-center border-3 border-foreground bg-card text-foreground shadow-[3px_3px_0px_0px_var(--foreground)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0px_0px_var(--foreground)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
+          aria-label="Reset workspace"
+          title="Reset"
         >
-          <Github className="size-4" />
-        </a>
-        <a
-          href="https://vercel.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="border-2 border-foreground bg-card p-2 transition-all shadow-[2px_2px_0px_0px_var(--foreground)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_var(--foreground)]"
-          aria-label="Deploy to Vercel"
-          title="Deploy to Vercel"
+          <RotateCcw className="size-4" strokeWidth={2.5} />
+        </button>
+        <button
+          onClick={() => setSettingsOpen(!settingsOpen)}
+          className={`flex size-10 items-center justify-center border-3 border-foreground shadow-[3px_3px_0px_0px_var(--foreground)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0px_0px_var(--foreground)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none ${
+            settingsOpen
+              ? 'bg-[var(--secondary)] text-foreground'
+              : 'bg-card text-foreground'
+          }`}
+          aria-label="Toggle settings"
+          title="Settings"
         >
-          <Globe className="size-4" />
-        </a>
-      </nav>
+          <Settings2 className="size-4" strokeWidth={2.5} />
+        </button>
+      </div>
     </header>
   )
 }

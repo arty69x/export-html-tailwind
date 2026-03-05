@@ -19,6 +19,9 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
   themeColor: '#fef9ef',
 }
 
@@ -28,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="bg-[#fef9ef]">
       <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         {children}
         <Toaster position="bottom-right" />
