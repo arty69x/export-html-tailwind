@@ -25,21 +25,16 @@ function PreviewPageContent() {
     }
 
     const renderPreview = async () => {
-      setLoading(true)
-      setError(null)
-
       try {
         const response = await fetch(`/api/previews/${id}`)
         if (!response.ok) {
           setError('Preview content not found')
-          setLoading(false)
           return
         }
 
         const payload = (await response.json()) as PreviewPayload
         if (!payload?.code || (payload.format !== 'html' && payload.format !== 'nextjs')) {
           setError('Preview payload is invalid')
-          setLoading(false)
           return
         }
 
@@ -49,12 +44,10 @@ function PreviewPageContent() {
         document.close()
       } catch {
         setError('Failed to render preview')
-      } finally {
-        setLoading(false)
       }
     }
 
-    void renderPreview()
+    renderPreview()
   }, [searchParams])
 
   if (loading && !error) {
