@@ -78,7 +78,28 @@ export function PreviewRenderer() {
     return buildPreviewHTML(generatedCode, exportFormat)
   }, [exportFormat, generatedCode])
 
-  const renderPreview = () => {
+      if (nextItems.length === 0) {
+        setSelectedHistoryId('')
+        return []
+      }
+
+      const hasSelected = nextItems.some((item) => item.id === selectedHistoryId)
+      if (!hasSelected) {
+        setSelectedHistoryId(nextItems[0].id)
+      }
+
+      return nextItems
+    } catch {
+      setHistoryItems([])
+      setSelectedHistoryId('')
+      setHistoryError('Failed to load history')
+      return []
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [selectedHistoryId])
+
+  const renderPreview = useCallback(async () => {
     if (!generatedCode) return
 
     const nextId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -131,6 +152,7 @@ export function PreviewRenderer() {
               viewMode === 'preview' ? 'bg-card text-foreground' : 'bg-background text-muted-foreground hover:bg-card'
             }`}
             aria-pressed={viewMode === 'preview'}
+            type="button"
           >
             Preview
           </button>

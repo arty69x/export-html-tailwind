@@ -16,6 +16,8 @@ function PreviewPageContent() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+    const controller = new AbortController()
     const id = searchParams.get('id')
 
     if (!id) {
