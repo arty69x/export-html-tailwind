@@ -11,6 +11,12 @@ const viewportWidths: Record<ViewportSize, string> = {
   desktop: '100%',
 }
 
+interface PreviewHistoryItem {
+  id: string
+  createdAt: number
+  format: ExportFormat
+}
+
 export function PreviewRenderer() {
   const { generatedCode, exportFormat, viewport, setViewport, uploadedImage } = useAppStore()
   const [previewId, setPreviewId] = useState('')
@@ -18,6 +24,8 @@ export function PreviewRenderer() {
   const [showOverlay, setShowOverlay] = useState(false)
   const [overlayOpacity, setOverlayOpacity] = useState(45)
   const [scanEnabled, setScanEnabled] = useState(false)
+  const [historyItems, setHistoryItems] = useState<PreviewHistoryItem[]>([])
+  const [selectedHistoryId, setSelectedHistoryId] = useState('')
 
   const previewUrl = useMemo(() => {
     if (!previewId) return 'about:blank'
