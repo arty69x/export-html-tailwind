@@ -74,7 +74,7 @@ export function PreviewRenderer() {
               onClick={() => setViewport(key)}
               className={`flex min-h-[36px] min-w-[36px] items-center justify-center border-2 border-foreground p-1.5 transition-all ${
                 viewport === key
-                  ? 'bg-[var(--secondary)] text-foreground shadow-[2px_2px_0px_0px_var(--foreground)]'
+                  ? 'bg-[var(--secondary)]/30 text-foreground'
                   : 'bg-card text-foreground hover:bg-muted'
               }`}
               aria-label={label}
