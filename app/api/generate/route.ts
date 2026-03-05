@@ -50,7 +50,15 @@ function buildAgentInstruction(agentMode?: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { image, format, provider, geminiApiKey, ollamaUrl, ollamaModel } =
+    const {
+      image,
+      format,
+      provider,
+      geminiApiKey,
+      ollamaUrl,
+      ollamaModel,
+      agentMode,
+    } =
       body
 
     if (!image) {
