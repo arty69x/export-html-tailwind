@@ -9,7 +9,7 @@ import { useAppStore } from '@/lib/store'
 import { Code2, Eye } from 'lucide-react'
 
 export default function Home() {
-  const { activeTab, setActiveTab, generatedCode } = useAppStore()
+  const { activePanel, setActivePanel, generatedCode } = useAppStore()
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -62,13 +62,13 @@ export default function Home() {
             {/* Tab Switcher */}
             <div className="flex border-b-3 border-foreground bg-muted">
               <button
-                onClick={() => setActiveTab('code')}
+                onClick={() => setActivePanel('code')}
                 className={`flex flex-1 items-center justify-center gap-2 px-6 py-3 text-sm font-bold transition-colors ${
-                  activeTab === 'code'
+                  activePanel === 'code'
                     ? 'border-b-4 border-[var(--secondary)] bg-card text-foreground'
                     : 'text-muted-foreground hover:bg-card hover:text-foreground'
                 }`}
-                aria-selected={activeTab === 'code'}
+                aria-selected={activePanel === 'code'}
                 role="tab"
               >
                 <Code2 className="size-4" />
@@ -78,13 +78,13 @@ export default function Home() {
                 )}
               </button>
               <button
-                onClick={() => setActiveTab('preview')}
+                onClick={() => setActivePanel('preview')}
                 className={`flex flex-1 items-center justify-center gap-2 border-l-3 border-foreground px-6 py-3 text-sm font-bold transition-colors ${
-                  activeTab === 'preview'
+                  activePanel === 'preview'
                     ? 'border-b-4 border-[var(--secondary)] bg-card text-foreground'
                     : 'text-muted-foreground hover:bg-card hover:text-foreground'
                 }`}
-                aria-selected={activeTab === 'preview'}
+                aria-selected={activePanel === 'preview'}
                 role="tab"
               >
                 <Eye className="size-4" />
@@ -94,7 +94,7 @@ export default function Home() {
 
             {/* Tab Content */}
             <div className="flex-1">
-              {activeTab === 'code' ? <CodeEditor /> : <PreviewRenderer />}
+              {activePanel === 'code' ? <CodeEditor /> : <PreviewRenderer />}
             </div>
           </div>
         </div>
