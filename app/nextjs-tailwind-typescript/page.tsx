@@ -1,20 +1,102 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from 'react'
+import { buildPreviewHTML } from '@/lib/preview-html'
+import type { ExportFormat } from '@/lib/store'
+import { useEffect, useMemo, useState } from 'react'
 
-const ACTIONS = ['Export', 'Save', 'Open Browser'] as const
+const DEFAULT_FILE_NAME = 'nextjs-tailwind-typescript.tsx'
+
+type ViewMode = 'text' | 'render'
 
 export default function NextJsTailwindTypescriptPage() {
   const [generatedCode, setGeneratedCode] = useState('')
+  const [generatedFormat, setGeneratedFormat] = useState<ExportFormat>('nextjs')
+  const [viewMode, setViewMode] = useState<ViewMode>('render')
+  const [previewSrc, setPreviewSrc] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   useEffect(() => {
     try {
       const latestCode = window.sessionStorage.getItem('latestGeneratedCode')
+      const latestFormat = window.sessionStorage.getItem('latestGeneratedFormat')
       setGeneratedCode(typeof latestCode === 'string' ? latestCode : '')
+      setGeneratedFormat(latestFormat === 'html' ? 'html' : 'nextjs')
     } catch {
       setGeneratedCode('')
+      setGeneratedFormat('nextjs')
     }
   }, [])
+
+  useEffect(() => {
+    if (!generatedCode.trim()) {
+      setPreviewSrc('')
+      setPreviewError(null)
+      return
+    }
+
+    setPreviewLoading(true)
+    setPreviewError(null)
+
+    try {
+      const previewHtml = buildPreviewHTML(generatedCode, generatedFormat)
+      const blob = new Blob([previewHtml], { type: 'text/html;charset=utf-8' })
+      const objectUrl = URL.createObjectURL(blob)
+      setPreviewSrc(objectUrl)
+
+      return () => {
+        URL.revokeObjectURL(objectUrl)
+      }
+    } catch {
+      setPreviewSrc('')
+      setPreviewError('Failed to render preview')
+      return
+    } finally {
+      setPreviewLoading(false)
+    }
+  }, [generatedCode, generatedFormat])
+
+  const hasCode = useMemo(() => generatedCode.trim().length > 0, [generatedCode])
+
+  const handleExport = () => {
+    if (!hasCode) {
+      return
+    }
+
+    const extension = generatedFormat === 'html' ? 'html' : 'tsx'
+    const fileName = generatedFormat === 'html' ? 'generated-ui.html' : DEFAULT_FILE_NAME
+    const blob = new Blob([generatedCode], { type: extension === 'html' ? 'text/html' : 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleSave = () => {
+    if (!hasCode) {
+      return
+    }
+
+    try {
+      window.localStorage.setItem('savedGeneratedCode', generatedCode)
+      window.localStorage.setItem('savedGeneratedFormat', generatedFormat)
+      window.localStorage.setItem('savedGeneratedAt', String(Date.now()))
+    } catch {
+      // Ignore storage write failures in restricted browsers.
+    }
+  }
+
+  const handleOpenBrowser = () => {
+    if (!previewSrc) {
+      return
+    }
+
+    window.open(previewSrc, '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -24,53 +106,75 @@ export default function NextJsTailwindTypescriptPage() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <h1 className="break-all text-lg font-semibold tracking-tight sm:text-xl lg:text-2xl">nextjs tailwind typescript.tsx</h1>
-                <p className="text-sm text-slate-400">Mobile-first editor: view code or render screen.</p>
+                <p className="text-sm text-slate-400">Generate → review code → render screen in a separate browser context.</p>
               </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={handleExport}
-                  className="min-h-[44px] rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 active:scale-[0.98]"
+                  disabled={!hasCode}
+                  className="min-h-[44px] rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Export
                 </button>
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="min-h-[44px] rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 active:scale-[0.98]"
+                  disabled={!hasCode}
+                  className="min-h-[44px] rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={handleOpenBrowser}
-                  className="min-h-[44px] rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 active:scale-[0.98]"
+                  disabled={!previewSrc}
+                  className="min-h-[44px] rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Open Browser
                 </button>
               </div>
-            </div>
 
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
-              <pre className="overflow-x-auto text-sm leading-6 text-slate-200">
-                <code>{generatedCode || 'No generated code available.'}</code>
-              </pre>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('text')}
+                  className={`min-h-[40px] rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                    viewMode === 'text'
+                      ? 'border-sky-400 bg-sky-500/20 text-sky-100'
+                      : 'border-slate-700 bg-slate-800 text-slate-100 hover:border-slate-500'
+                  }`}
+                >
+                  Source Code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('render')}
+                  className={`min-h-[40px] rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                    viewMode === 'render'
+                      ? 'border-sky-400 bg-sky-500/20 text-sky-100'
+                      : 'border-slate-700 bg-slate-800 text-slate-100 hover:border-slate-500'
+                  }`}
+                >
+                  Render Screen
+                </button>
+              </div>
             </div>
 
             {viewMode === 'text' ? (
               <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
                 <pre className="max-h-[62vh] overflow-auto text-xs leading-6 text-slate-200 sm:text-sm">
-                  <code>{generatedCode || 'No generated code available.'}</code>
+                  <code>{hasCode ? generatedCode : 'No generated code available.'}</code>
                 </pre>
               </div>
             ) : (
               <div className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950 p-3 sm:p-4 lg:p-6">
                 {previewLoading && <p className="text-sm text-slate-400">Rendering preview...</p>}
                 {previewError && <p className="text-sm text-rose-300">{previewError}</p>}
-                {!generatedCode && <p className="text-sm text-slate-400">No generated code available.</p>}
+                {!hasCode && <p className="text-sm text-slate-400">No generated code available.</p>}
 
-                {generatedCode && !previewError && (
+                {hasCode && !previewError && previewSrc && (
                   <iframe
                     src={previewSrc}
                     title="Generated screen preview"

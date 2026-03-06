@@ -35,7 +35,37 @@ export function renderTsxDocument(code: string): string {
       .replace(/export\\s+default\\s+/g, '')
 
     try {
-      const runtimeCode = '"use strict";\\n' + cleaned + '\\nreturn typeof GeneratedUI === "function" ? GeneratedUI : (typeof GeneratedComponent === "function" ? GeneratedComponent : (typeof Page === "function" ? Page : null));'
+      const hooks = [
+        'useState',
+        'useEffect',
+        'useMemo',
+        'useCallback',
+        'useRef',
+        'useContext',
+        'useReducer',
+        'useLayoutEffect',
+        'useId',
+        'useTransition',
+        'useDeferredValue',
+      ]
+      const hooksBridge = 'const {' + hooks.join(',') + '} = React;\\n'
+      const shims = `
+const Image = (props) => {
+  const { src = '', alt = '', fill, style, ...rest } = props || {}
+  const mergedStyle = fill
+    ? { width: '100%', height: '100%', objectFit: 'cover', ...(style || {}) }
+    : style
+  return React.createElement('img', { src, alt, style: mergedStyle, ...rest })
+}
+const Link = ({ href = '#', children, ...rest }) => React.createElement('a', { href, ...rest }, children)
+`
+
+      const runtimeCode =
+        '"use strict";\\n' +
+        hooksBridge +
+        shims +
+        cleaned +
+        '\\nreturn typeof GeneratedUI === "function" ? GeneratedUI : (typeof GeneratedComponent === "function" ? GeneratedComponent : (typeof Page === "function" ? Page : null));'
       const factory = new Function('React', runtimeCode)
       const Component = factory(React)
 
