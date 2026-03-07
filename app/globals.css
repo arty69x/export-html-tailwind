@@ -143,19 +143,3 @@
 @utility border-r-3 {
   border-right-width: 3px;
 }
-
-@keyframes overlay-scan {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(calc(100% - 2px)); }
-}
-
-.overlay-scan-line {
-  animation: overlay-scan 2.2s linear infinite alternate;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
-}
-
-pre,
-code {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
