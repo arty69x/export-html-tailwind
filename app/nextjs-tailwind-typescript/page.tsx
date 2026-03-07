@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import JSZip from 'jszip'
+import { buildPreviewHTML } from '@/lib/preview-html'
+import type { ExportFormat } from '@/lib/store'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 interface GenerateResponse {
   code?: string
@@ -46,35 +47,17 @@ export default function NextJsTailwindTypescriptPage() {
   const [imageDataUrl, setImageDataUrl] = useState('')
   const [imageName, setImageName] = useState('')
   const [generatedCode, setGeneratedCode] = useState('')
-  const [previewSrcDoc, setPreviewSrcDoc] = useState('')
-  const [domTree, setDomTree] = useState('')
-  const [status, setStatus] = useState<GenerationStatus>('idle')
-  const [errorMessage, setErrorMessage] = useState('')
+  const [generatedFormat, setGeneratedFormat] = useState<ExportFormat>('nextjs')
+  const [viewMode, setViewMode] = useState<ViewMode>('render')
+  const [previewSrc, setPreviewSrc] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const sourceCodeRef = useRef<HTMLElement | null>(null)
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const iframeRef = useRef<HTMLIFrameElement | null>(null)
-  const codeViewerRef = useRef<HTMLElement | null>(null)
-
-  const hasImage = imageDataUrl.length > 0
-  const hasCode = generatedCode.trim().length > 0
-
-  const statusLabel = useMemo(() => {
-    if (status === 'loading') return 'Generating...'
-    if (status === 'success') return 'Generated'
-    if (status === 'error') return 'Failed'
-    return 'Ready'
-  }, [status])
-
-  const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0]
-
-    if (!selectedFile) {
-      setImageDataUrl('')
-      setImageName('')
-      return
-    }
-
-    setImageName(selectedFile.name)
+  const safeCode = useMemo(
+    () => generatedCode.replace(/<script/gi, '&lt;script'),
+    [generatedCode],
+  )
 
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -130,9 +113,47 @@ export default function NextJsTailwindTypescriptPage() {
       return
     }
 
-    if (!geminiApiKey.trim()) {
-      setStatus('error')
-      setErrorMessage('Please provide a Gemini API key.')
+  useEffect(() => {
+    if (!sourceCodeRef.current) {
+      return
+    }
+
+    const sourceNode = sourceCodeRef.current
+    sourceNode.textContent = ''
+
+    if (!safeCode) {
+      sourceNode.textContent = 'No generated code available.'
+      return
+    }
+
+    let frameId = 0
+    let index = 0
+    const chunkSize = 5000
+
+    const renderChunk = () => {
+      if (!sourceCodeRef.current) {
+        return
+      }
+
+      sourceCodeRef.current.textContent += safeCode.slice(index, index + chunkSize)
+      index += chunkSize
+
+      if (index < safeCode.length) {
+        frameId = window.requestAnimationFrame(renderChunk)
+      }
+    }
+
+    frameId = window.requestAnimationFrame(renderChunk)
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId)
+      }
+    }
+  }, [safeCode])
+
+  const handleExport = () => {
+    if (!hasCode) {
       return
     }
 
@@ -336,26 +357,17 @@ export default function App({ Component, pageProps }: AppProps) {
                       <p className="text-xs text-slate-400">{imageName || 'No file selected'}</p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleGenerateCode()}
-                        disabled={status === 'loading'}
-                        className="min-h-[44px] rounded-lg bg-sky-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {status === 'loading' ? 'Generating...' : 'Generate Code'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleExportNextZip()}
-                        disabled={!hasCode}
-                        className="min-h-[44px] rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Export Next.js ZIP
-                      </button>
-                    </div>
-                  </div>
-                </div>
+            {viewMode === 'text' ? (
+              <div className="min-w-0 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
+                <pre className="max-h-[70vh] overflow-auto overflow-x-auto whitespace-pre-wrap break-words text-xs leading-6 text-slate-200 sm:text-sm">
+                  <code ref={sourceCodeRef} />
+                </pre>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950 p-3 sm:p-4 lg:p-6">
+                {previewLoading && <p className="text-sm text-slate-400">Rendering preview...</p>}
+                {previewError && <p className="text-sm text-rose-300">{previewError}</p>}
+                {!hasCode && <p className="text-sm text-slate-400">No generated code available.</p>}
 
                 <div className="flex flex-col gap-2">
                   <h2 className="text-sm text-slate-300">Preview</h2>
