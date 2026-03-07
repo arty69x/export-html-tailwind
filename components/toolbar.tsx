@@ -106,6 +106,7 @@ export function Toolbar() {
 
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem('latestGeneratedCode', data.code)
+        window.sessionStorage.setItem('latestGeneratedFormat', exportFormat)
       }
 
       setTimeout(() => {
