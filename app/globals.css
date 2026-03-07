@@ -153,3 +153,9 @@
   animation: overlay-scan 2.2s linear infinite alternate;
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
 }
+
+pre,
+code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
