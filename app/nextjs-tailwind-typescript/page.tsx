@@ -2,7 +2,7 @@
 
 import { buildPreviewHTML } from '@/lib/preview-html'
 import type { ExportFormat } from '@/lib/store'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const DEFAULT_FILE_NAME = 'nextjs-tailwind-typescript.tsx'
 
@@ -15,6 +15,12 @@ export default function NextJsTailwindTypescriptPage() {
   const [previewSrc, setPreviewSrc] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
+  const sourceCodeRef = useRef<HTMLElement | null>(null)
+
+  const safeCode = useMemo(
+    () => generatedCode.replace(/<script/gi, '&lt;script'),
+    [generatedCode],
+  )
 
   useEffect(() => {
     try {
@@ -57,6 +63,45 @@ export default function NextJsTailwindTypescriptPage() {
   }, [generatedCode, generatedFormat])
 
   const hasCode = useMemo(() => generatedCode.trim().length > 0, [generatedCode])
+
+  useEffect(() => {
+    if (!sourceCodeRef.current) {
+      return
+    }
+
+    const sourceNode = sourceCodeRef.current
+    sourceNode.textContent = ''
+
+    if (!safeCode) {
+      sourceNode.textContent = 'No generated code available.'
+      return
+    }
+
+    let frameId = 0
+    let index = 0
+    const chunkSize = 5000
+
+    const renderChunk = () => {
+      if (!sourceCodeRef.current) {
+        return
+      }
+
+      sourceCodeRef.current.textContent += safeCode.slice(index, index + chunkSize)
+      index += chunkSize
+
+      if (index < safeCode.length) {
+        frameId = window.requestAnimationFrame(renderChunk)
+      }
+    }
+
+    frameId = window.requestAnimationFrame(renderChunk)
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId)
+      }
+    }
+  }, [safeCode])
 
   const handleExport = () => {
     if (!hasCode) {
@@ -163,9 +208,9 @@ export default function NextJsTailwindTypescriptPage() {
             </div>
 
             {viewMode === 'text' ? (
-              <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
-                <pre className="max-h-[62vh] overflow-auto text-xs leading-6 text-slate-200 sm:text-sm">
-                  <code>{hasCode ? generatedCode : 'No generated code available.'}</code>
+              <div className="min-w-0 rounded-xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
+                <pre className="max-h-[70vh] overflow-auto overflow-x-auto whitespace-pre-wrap break-words text-xs leading-6 text-slate-200 sm:text-sm">
+                  <code ref={sourceCodeRef} />
                 </pre>
               </div>
             ) : (
