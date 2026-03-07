@@ -1,11 +1,18 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-const GEMINI_API_KEY = 'AIzaSyArqo7bpYKUeFmqg8F8DYlAI4ABR1UU3XE'
-
 export type ExportFormat = 'html' | 'nextjs'
 export type AIProvider = 'gemini' | 'ollama'
 export type ViewportSize = 'mobile' | 'tablet' | 'desktop'
+export type PipelineStage =
+  | 'idle'
+  | 'validating input'
+  | 'preparing prompt'
+  | 'sending request'
+  | 'analyzing image'
+  | 'generating code'
+  | 'finalizing output'
+  | 'completed'
 
 interface AppState {
   // Image
@@ -37,10 +44,14 @@ interface AppState {
   setIsGenerating: (loading: boolean) => void
   generationError: string | null
   setGenerationError: (error: string | null) => void
+  generationProgress: number
+  setGenerationProgress: (progress: number) => void
+  generationStage: PipelineStage
+  setGenerationStage: (stage: PipelineStage) => void
 
   // Active panel
-  activePanel: 'code' | 'preview'
-  setActivePanel: (panel: 'code' | 'preview') => void
+  activeTab: 'code' | 'preview'
+  setActiveTab: (panel: 'code' | 'preview') => void
 
   // Preview viewport
   viewport: ViewportSize
@@ -74,16 +85,21 @@ export const useAppStore = create<AppState>()(
       setOllamaUrl: (url) => set({ ollamaUrl: url }),
       ollamaModel: 'llava',
       setOllamaModel: (model) => set({ ollamaModel: model }),
-      geminiApiKey: GEMINI_API_KEY,
+      geminiApiKey: '',
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
 
       isGenerating: false,
       setIsGenerating: (loading) => set({ isGenerating: loading }),
       generationError: null,
       setGenerationError: (error) => set({ generationError: error }),
+      generationProgress: 0,
+      setGenerationProgress: (progress) =>
+        set({ generationProgress: Math.max(0, Math.min(100, progress)) }),
+      generationStage: 'idle',
+      setGenerationStage: (stage) => set({ generationStage: stage }),
 
-      activePanel: 'code',
-      setActivePanel: (panel) => set({ activePanel: panel }),
+      activeTab: 'code',
+      setActiveTab: (panel) => set({ activeTab: panel }),
 
       viewport: 'desktop',
       setViewport: (size) => set({ viewport: size }),
@@ -98,7 +114,9 @@ export const useAppStore = create<AppState>()(
           generatedCode: '',
           isGenerating: false,
           generationError: null,
-          activePanel: 'code',
+          generationProgress: 0,
+          generationStage: 'idle',
+          activeTab: 'code',
         }),
     }),
     {
