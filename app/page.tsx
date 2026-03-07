@@ -9,7 +9,7 @@ import { useAppStore } from '@/lib/store'
 import { Code2, Eye } from 'lucide-react'
 
 export default function Home() {
-  const { activePanel, setActivePanel, generatedCode } = useAppStore()
+  const { activeTab, setActiveTab, generatedCode } = useAppStore()
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -17,14 +17,14 @@ export default function Home() {
 
       <main className="flex flex-1 flex-col">
         {/* Toolbar */}
-        <section className="border-b-3 border-foreground bg-background px-4 py-3 sm:px-6 sm:py-4">
+        <section className="border-b-3 border-foreground bg-background px-6 py-4">
           <Toolbar />
         </section>
 
         {/* Main Content */}
         <div className="flex flex-1 flex-col lg:flex-row">
           {/* Left Panel - Image Upload */}
-          <aside className="w-full border-b-3 border-foreground bg-background p-4 sm:p-6 lg:w-[400px] lg:border-b-0 lg:border-r-3">
+          <aside className="w-full border-b-3 border-foreground bg-background p-6 lg:w-[400px] lg:border-b-0 lg:border-r-3">
             <h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
               <span className="inline-flex size-6 items-center justify-center border-2 border-foreground bg-[var(--secondary)] text-xs font-bold text-foreground">
                 1
@@ -34,7 +34,7 @@ export default function Home() {
             <ImageUpload />
 
             {/* Quick Info */}
-            <div className="mt-4 rounded-md border border-border bg-muted/40 p-4">
+            <div className="mt-4 border-3 border-foreground bg-muted p-4 shadow-[3px_3px_0px_0px_var(--foreground)]">
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wider">How it works</h3>
               <ol className="space-y-2 text-xs text-muted-foreground">
                 <li className="flex gap-2">
@@ -62,48 +62,46 @@ export default function Home() {
             {/* Tab Switcher */}
             <div className="flex border-b-3 border-foreground bg-muted">
               <button
-                onClick={() => setActivePanel('code')}
-                className={`flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-bold transition-colors sm:px-6 ${
-                  activePanel === 'code'
-                    ? 'border-b-2 border-[var(--secondary)] bg-card text-foreground'
-                    : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
+                onClick={() => setActiveTab('code')}
+                className={`flex flex-1 items-center justify-center gap-2 px-6 py-3 text-sm font-bold transition-colors ${
+                  activeTab === 'code'
+                    ? 'border-b-4 border-[var(--secondary)] bg-card text-foreground'
+                    : 'text-muted-foreground hover:bg-card hover:text-foreground'
                 }`}
-                aria-selected={activePanel === 'code'}
+                aria-selected={activeTab === 'code'}
                 role="tab"
               >
                 <Code2 className="size-4" />
-                <span className="hidden sm:inline">Code Editor</span>
-                <span className="sm:hidden">Code</span>
+                Code Editor
                 {generatedCode && (
                   <span className="inline-flex size-2 rounded-full bg-[var(--accent)]" />
                 )}
               </button>
               <button
-                onClick={() => setActivePanel('preview')}
-                className={`flex flex-1 items-center justify-center gap-2 border-l-3 border-foreground px-4 py-3 text-sm font-bold transition-colors sm:px-6 ${
-                  activePanel === 'preview'
-                    ? 'border-b-2 border-[var(--secondary)] bg-card text-foreground'
-                    : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
+                onClick={() => setActiveTab('preview')}
+                className={`flex flex-1 items-center justify-center gap-2 border-l-3 border-foreground px-6 py-3 text-sm font-bold transition-colors ${
+                  activeTab === 'preview'
+                    ? 'border-b-4 border-[var(--secondary)] bg-card text-foreground'
+                    : 'text-muted-foreground hover:bg-card hover:text-foreground'
                 }`}
-                aria-selected={activePanel === 'preview'}
+                aria-selected={activeTab === 'preview'}
                 role="tab"
               >
                 <Eye className="size-4" />
-                <span className="hidden sm:inline">Live Preview</span>
-                <span className="sm:hidden">Preview</span>
+                Live Preview
               </button>
             </div>
 
             {/* Tab Content */}
             <div className="flex-1">
-              {activePanel === 'code' ? <CodeEditor /> : <PreviewRenderer />}
+              {activeTab === 'code' ? <CodeEditor /> : <PreviewRenderer />}
             </div>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t-3 border-foreground bg-card px-4 py-3 sm:px-6">
+      <footer className="border-t-3 border-foreground bg-card px-6 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-muted-foreground">
           <span>
             PixelForge — Next.js 16 / Tailwind 4 / TypeScript
