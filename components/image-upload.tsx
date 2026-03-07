@@ -6,7 +6,14 @@ import { useAppStore } from '@/lib/store'
 import { toast } from 'sonner'
 
 export function ImageUpload() {
-  const { uploadedImage, setUploadedImage, setImageFile, isGenerating } = useAppStore()
+  const {
+    uploadedImage,
+    setUploadedImage,
+    setImageFile,
+    isGenerating,
+    generationProgress,
+    generationStage,
+  } = useAppStore()
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -89,7 +96,10 @@ export function ImageUpload() {
           <div className="absolute inset-0 flex items-center justify-center bg-foreground/70">
             <div className="flex items-center gap-3 border-3 border-foreground bg-[var(--secondary)] px-5 py-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]">
               <Loader2 className="size-5 animate-spin text-foreground" />
-              <span className="text-sm font-extrabold text-foreground">Analyzing image...</span>
+              <div className="flex flex-col">
+                <span className="text-sm font-extrabold text-foreground">{generationStage}</span>
+                <span className="text-xs font-bold text-foreground">{generationProgress}% complete</span>
+              </div>
             </div>
           </div>
         )}

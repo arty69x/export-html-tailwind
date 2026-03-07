@@ -10,13 +10,27 @@ This repository is linked to a [v0](https://v0.app) project. You can continue de
 
 ## Getting Started
 
-First, run the development server:
+1. Install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+```
+
+2. Set environment variables:
+
+```bash
+cp .env.example .env.local
+```
+
+Then set your Gemini API key in `.env.local`:
+
+```bash
+GEMINI_API_KEY=your_real_key
+```
+
+3. Run the development server:
+
+```bash
 pnpm dev
 ```
 

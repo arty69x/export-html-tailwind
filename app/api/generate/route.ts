@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const GEMINI_API_KEY = 'AIzaSyArqo7bpYKUeFmqg8F8DYlAI4ABR1UU3XE'
-
 const SYSTEM_PROMPT_HTML = `You are an elite frontend developer. Convert the provided UI screenshot into production-ready HTML with Tailwind CSS utility classes.
 
 Rules:
@@ -44,65 +42,66 @@ export async function POST(request: NextRequest) {
     const systemPrompt =
       format === 'html' ? SYSTEM_PROMPT_HTML : SYSTEM_PROMPT_NEXTJS
 
-    let code: string
+    const code =
+      provider === 'gemini'
+        ? await generateWithGemini(image, systemPrompt, geminiApiKey)
+        : await generateWithOllama(image, systemPrompt, ollamaUrl)
 
-    if (provider === 'gemini') {
-      code = await generateWithGemini(image, systemPrompt, geminiApiKey)
-    } else {
-      code = await generateWithOllama(image, systemPrompt, ollamaUrl)
-    }
-
-    // Clean the code - remove markdown code fences if present
-    code = code
+    const cleanedCode = code
       .replace(/^```(?:html|tsx|jsx|typescript|javascript)?\n?/gm, '')
       .replace(/```$/gm, '')
       .trim()
 
-    return NextResponse.json({ code })
+    return NextResponse.json({ code: cleanedCode })
   } catch (error: unknown) {
     console.error('Generation error:', error)
     const message = error instanceof Error ? error.message : 'Generation failed'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
+
 async function generateWithGemini(
   image: string,
   systemPrompt: string,
-  apiKey: string
+  apiKey?: string
 ): Promise<string> {
+  const resolvedApiKey = apiKey || process.env.GEMINI_API_KEY || ''
 
-  const resolvedApiKey = apiKey || GEMINI_API_KEY
+  if (!resolvedApiKey) {
+    throw new Error(
+      'Gemini API key is missing. Set GEMINI_API_KEY in .env.local or enter a key in Settings.'
+    )
+  }
 
   const match = image.match(/^data:(image\/\w+);base64,(.+)$/)
   if (!match) {
-    throw new Error("Invalid image format")
+    throw new Error('Invalid image format')
   }
 
   const mimeType = match[1]
   const base64Data = match[2]
 
-  const MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-    "gemini-3.0-flash",
-    "gemini-3.0-pro",
-    "gemini-3.1-flash",
-    "gemini-3.1-pro"
+  const models = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-3.0-flash',
+    'gemini-3.0-pro',
+    'gemini-3.1-flash',
+    'gemini-3.1-pro',
   ]
 
-  let lastError: any = null
+  let lastError: Error | null = null
 
-  for (const model of MODELS) {
+  for (const model of models) {
     try {
-
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${resolvedApiKey}`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json"
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             contents: [
@@ -112,64 +111,65 @@ async function generateWithGemini(
                   {
                     inlineData: {
                       mimeType,
-                      data: base64Data
-                    }
+                      data: base64Data,
+                    },
                   },
                   {
-                    text: "Convert this UI screenshot to code. Output ONLY the code, no explanations."
-                  }
-                ]
-              }
+                    text: 'Convert this UI screenshot to code. Output ONLY the code, no explanations.',
+                  },
+                ],
+              },
             ],
             generationConfig: {
               temperature: 0.2,
-              maxOutputTokens: 8192
-            }
-          })
+              maxOutputTokens: 8192,
+            },
+          }),
         }
       )
 
       if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err?.error?.message || `HTTP ${response.status}`)
+        let errorMessage = `HTTP ${response.status}`
+
+        try {
+          const err = await response.json()
+          errorMessage = err?.error?.message || errorMessage
+        } catch {
+          // Ignore parse errors and keep fallback message
+        }
+
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
-
-      const text =
-        data?.candidates?.[0]?.content?.parts?.[0]?.text
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
 
       if (!text) {
-        throw new Error("Empty response")
+        throw new Error('Empty response')
       }
 
       console.log(`Gemini success with model: ${model}`)
-
       return text
+    } catch (error: unknown) {
+      const normalizedError =
+        error instanceof Error ? error : new Error('Unknown Gemini error')
 
-    } catch (err: any) {
-
-      console.warn(`Gemini failed: ${model}`, err.message)
-
-      lastError = err
-
-      continue
+      console.warn(`Gemini failed: ${model}`, normalizedError.message)
+      lastError = normalizedError
     }
   }
 
   throw new Error(
-    `All Gemini models failed. Last error: ${lastError?.message}`
+    `All Gemini models failed. Last error: ${lastError?.message || 'Unknown error'}`
   )
 }
 
 async function generateWithOllama(
   image: string,
   systemPrompt: string,
-  serverUrl: string
+  serverUrl?: string
 ): Promise<string> {
   const url = serverUrl || 'http://localhost:11434'
-
-  // Extract base64 data
   const base64Data = image.replace(/^data:image\/\w+;base64,/, '')
 
   const response = await fetch(`${url}/api/generate`, {
@@ -197,5 +197,6 @@ async function generateWithOllama(
   if (!data?.response) {
     throw new Error('No response from Ollama')
   }
+
   return data.response
 }

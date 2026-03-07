@@ -3,7 +3,16 @@
 import { useAppStore } from '@/lib/store'
 import { Zap, Settings2, Code2, FileCode2, Bot, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+
+const PIPELINE_STEPS = [
+  { stage: 'validating input', progress: 10 },
+  { stage: 'preparing prompt', progress: 25 },
+  { stage: 'sending request', progress: 40 },
+  { stage: 'analyzing image', progress: 60 },
+  { stage: 'generating code', progress: 82 },
+  { stage: 'finalizing output', progress: 95 },
+] as const
 
 export function Toolbar() {
   const {
@@ -18,9 +27,52 @@ export function Toolbar() {
     setActiveTab,
     geminiApiKey,
     ollamaUrl,
+    generationProgress,
+    setGenerationProgress,
+    generationStage,
+    setGenerationStage,
+    setGenerationError,
   } = useAppStore()
 
   const [showSettings, setShowSettings] = useState(false)
+
+  useEffect(() => {
+    if (!isGenerating) {
+      return
+    }
+
+    let currentStep = 0
+    setGenerationStage(PIPELINE_STEPS[0].stage)
+    setGenerationProgress(PIPELINE_STEPS[0].progress)
+
+    const timer = window.setInterval(() => {
+      currentStep += 1
+
+      if (currentStep >= PIPELINE_STEPS.length) {
+        window.clearInterval(timer)
+        return
+      }
+
+      setGenerationStage(PIPELINE_STEPS[currentStep].stage)
+      setGenerationProgress(PIPELINE_STEPS[currentStep].progress)
+    }, 1200)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [isGenerating, setGenerationProgress, setGenerationStage])
+
+  const canSubmit = useMemo(() => {
+    if (!uploadedImage || isGenerating) {
+      return false
+    }
+
+    if (aiProvider === 'gemini') {
+      return Boolean(geminiApiKey?.trim())
+    }
+
+    return true
+  }, [uploadedImage, isGenerating, aiProvider, geminiApiKey])
 
   const handleGenerate = async () => {
     if (!uploadedImage) {
@@ -28,13 +80,16 @@ export function Toolbar() {
       return
     }
 
-    if (aiProvider === 'gemini' && !geminiApiKey) {
-      toast.error('Enter your Gemini API key in settings')
+    if (aiProvider === 'gemini' && !geminiApiKey?.trim()) {
+      toast.error('Enter your Gemini API key in settings or set GEMINI_API_KEY in .env.local')
       setShowSettings(true)
       return
     }
 
     setIsGenerating(true)
+    setGenerationError(null)
+    setGenerationProgress(5)
+    setGenerationStage('validating input')
     setActiveTab('code')
 
     try {
@@ -56,130 +111,138 @@ export function Toolbar() {
       }
 
       const data = await response.json()
+      setGenerationStage('completed')
+      setGenerationProgress(100)
       setGeneratedCode(data.code)
       toast.success('Code generated successfully!')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Generation failed'
+      setGenerationError(message)
       toast.error(message)
     } finally {
-      setIsGenerating(false)
+      window.setTimeout(() => {
+        setIsGenerating(false)
+        setGenerationStage('idle')
+        setGenerationProgress(0)
+      }, 500)
     }
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      {/* Export Format Selector */}
-      <div className="flex border-3 border-foreground">
+    <div className="flex w-full flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex border-3 border-foreground">
+          <button
+            onClick={() => setExportFormat('html')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold transition-colors ${
+              exportFormat === 'html'
+                ? 'bg-[var(--secondary)] text-foreground'
+                : 'bg-card text-foreground hover:bg-muted'
+            }`}
+            aria-pressed={exportFormat === 'html'}
+          >
+            <Code2 className="size-4" />
+            HTML
+          </button>
+          <button
+            onClick={() => setExportFormat('nextjs')}
+            className={`flex items-center gap-1.5 border-l-3 border-foreground px-4 py-2 text-sm font-bold transition-colors ${
+              exportFormat === 'nextjs'
+                ? 'bg-[var(--secondary)] text-foreground'
+                : 'bg-card text-foreground hover:bg-muted'
+            }`}
+            aria-pressed={exportFormat === 'nextjs'}
+          >
+            <FileCode2 className="size-4" />
+            Next.js
+          </button>
+        </div>
+
+        <div className="flex border-3 border-foreground">
+          <button
+            onClick={() => setAIProvider('gemini')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold transition-colors ${
+              aiProvider === 'gemini'
+                ? 'bg-[var(--accent)] text-foreground'
+                : 'bg-card text-foreground hover:bg-muted'
+            }`}
+            aria-pressed={aiProvider === 'gemini'}
+          >
+            <Bot className="size-4" />
+            Gemini
+          </button>
+          <button
+            onClick={() => setAIProvider('ollama')}
+            className={`flex items-center gap-1.5 border-l-3 border-foreground px-4 py-2 text-sm font-bold transition-colors ${
+              aiProvider === 'ollama'
+                ? 'bg-[var(--accent)] text-foreground'
+                : 'bg-card text-foreground hover:bg-muted'
+            }`}
+            aria-pressed={aiProvider === 'ollama'}
+          >
+            <Bot className="size-4" />
+            Ollama
+          </button>
+        </div>
+
         <button
-          onClick={() => setExportFormat('html')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold transition-colors ${
-            exportFormat === 'html'
-              ? 'bg-[var(--secondary)] text-foreground'
-              : 'bg-card text-foreground hover:bg-muted'
+          onClick={() => setShowSettings(!showSettings)}
+          className={`border-3 border-foreground p-2 transition-all shadow-[3px_3px_0px_0px_var(--foreground)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0px_0px_var(--foreground)] ${
+            showSettings ? 'bg-[var(--secondary)] text-foreground' : 'bg-card text-foreground'
           }`}
-          aria-pressed={exportFormat === 'html'}
+          aria-label="Toggle settings"
+          title="Settings"
         >
-          <Code2 className="size-4" />
-          HTML
+          <Settings2 className="size-5" />
         </button>
+
         <button
-          onClick={() => setExportFormat('nextjs')}
-          className={`flex items-center gap-1.5 border-l-3 border-foreground px-4 py-2 text-sm font-bold transition-colors ${
-            exportFormat === 'nextjs'
-              ? 'bg-[var(--secondary)] text-foreground'
-              : 'bg-card text-foreground hover:bg-muted'
-          }`}
-          aria-pressed={exportFormat === 'nextjs'}
+          onClick={handleGenerate}
+          disabled={!canSubmit}
+          className="ml-auto flex items-center gap-2 border-3 border-foreground bg-[var(--secondary)] px-6 py-2 text-base font-bold text-foreground shadow-[4px_4px_0px_0px_var(--foreground)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_var(--foreground)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none disabled:opacity-50 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0px_0px_var(--foreground)]"
         >
-          <FileCode2 className="size-4" />
-          Next.js
+          <Zap className="size-5" />
+          {isGenerating ? 'Generating...' : 'Generate Code'}
         </button>
       </div>
 
-      {/* AI Provider Selector */}
-      <div className="flex border-3 border-foreground">
-        <button
-          onClick={() => setAIProvider('gemini')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold transition-colors ${
-            aiProvider === 'gemini'
-              ? 'bg-[var(--accent)] text-foreground'
-              : 'bg-card text-foreground hover:bg-muted'
-          }`}
-          aria-pressed={aiProvider === 'gemini'}
-        >
-          <Bot className="size-4" />
-          Gemini
-        </button>
-        <button
-          onClick={() => setAIProvider('ollama')}
-          className={`flex items-center gap-1.5 border-l-3 border-foreground px-4 py-2 text-sm font-bold transition-colors ${
-            aiProvider === 'ollama'
-              ? 'bg-[var(--accent)] text-foreground'
-              : 'bg-card text-foreground hover:bg-muted'
-          }`}
-          aria-pressed={aiProvider === 'ollama'}
-        >
-          <Bot className="size-4" />
-          Ollama
-        </button>
-      </div>
+      {isGenerating && (
+        <div className="grid grid-cols-1 gap-2 border-3 border-foreground bg-card p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Pipeline status
+            </span>
+            <span className="text-sm font-extrabold text-foreground">
+              {generationProgress}%
+            </span>
+          </div>
+          <progress
+            className="h-3 w-full border-2 border-foreground bg-muted [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:bg-[var(--accent)] [&::-moz-progress-bar]:bg-[var(--accent)]"
+            max={100}
+            value={generationProgress}
+          />
+          <p className="text-sm font-bold capitalize text-foreground">Current step: {generationStage}</p>
+        </div>
+      )}
 
-      {/* Settings Toggle */}
-      <button
-        onClick={() => setShowSettings(!showSettings)}
-        className={`border-3 border-foreground p-2 transition-all shadow-[3px_3px_0px_0px_var(--foreground)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0px_0px_var(--foreground)] ${
-          showSettings ? 'bg-[var(--secondary)] text-foreground' : 'bg-card text-foreground'
-        }`}
-        aria-label="Toggle settings"
-        title="Settings"
-      >
-        <Settings2 className="size-5" />
-      </button>
-
-      {/* Generate Button */}
-      <button
-        onClick={handleGenerate}
-        disabled={!uploadedImage || isGenerating}
-        className="ml-auto flex items-center gap-2 border-3 border-foreground bg-[var(--secondary)] px-6 py-2 text-base font-bold text-foreground shadow-[4px_4px_0px_0px_var(--foreground)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_var(--foreground)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none disabled:opacity-50 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0px_0px_var(--foreground)]"
-      >
-        <Zap className="size-5" />
-        {isGenerating ? 'Generating...' : 'Generate Code'}
-      </button>
-
-      {/* Settings Panel */}
       {showSettings && <SettingsPanel />}
     </div>
   )
 }
 
 function SettingsPanel() {
-  const {
-    aiProvider,
-    geminiApiKey,
-    setGeminiApiKey,
-    ollamaUrl,
-    setOllamaUrl,
-  } = useAppStore()
+  const { aiProvider, geminiApiKey, setGeminiApiKey, ollamaUrl, setOllamaUrl } = useAppStore()
 
   const handleCreateGeminiKey = () => {
     if (typeof window !== 'undefined') {
       window.open('https://aistudio.google.com/apikey', '_blank', 'noopener,noreferrer')
     }
-
-    const generatedKey =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? `AIzaSy${crypto.randomUUID().replace(/-/g, '').slice(0, 33)}`
-        : `AIzaSy${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
-
-    setGeminiApiKey(generatedKey)
-    toast.success('Generated API key saved in settings')
+    toast.message('Create key opened in Google AI Studio')
   }
 
   return (
     <div className="w-full border-3 border-foreground bg-card p-4 shadow-[4px_4px_0px_0px_var(--foreground)]">
-      <h3 className="mb-3 text-sm font-bold uppercase tracking-wider">
-        Settings
-      </h3>
+      <h3 className="mb-3 text-sm font-bold uppercase tracking-wider">Settings</h3>
       {aiProvider === 'gemini' ? (
         <div className="flex flex-col gap-2">
           <label htmlFor="gemini-key" className="text-sm font-bold">
@@ -204,7 +267,9 @@ function SettingsPanel() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Add your key manually, or click <span className="font-bold">Create key</span> to auto-generate and save one. Get a valid key from{' '}
+            Use a local key from <span className="font-bold">.env.local</span> with{' '}
+            <span className="font-mono">GEMINI_API_KEY=your_key</span> or paste it here. Get a valid
+            key from{' '}
             <a
               href="https://aistudio.google.com/apikey"
               target="_blank"
