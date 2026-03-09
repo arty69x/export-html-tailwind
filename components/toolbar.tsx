@@ -4,6 +4,7 @@ import { useAppStore } from '@/lib/store'
 import { Zap, Settings2, Code2, FileCode2, Bot, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEffect, useMemo, useState } from 'react'
+import { preprocessImage } from '@/utils/image-processing'
 
 const PIPELINE_STEPS = [
   { stage: 'validating input', progress: 10 },
@@ -17,6 +18,7 @@ const PIPELINE_STEPS = [
 export function Toolbar() {
   const {
     uploadedImage,
+    imageFile,
     exportFormat,
     setExportFormat,
     aiProvider,
@@ -75,8 +77,13 @@ export function Toolbar() {
   }, [uploadedImage, isGenerating, aiProvider, geminiApiKey])
 
   const handleGenerate = async () => {
-    if (!uploadedImage) {
+    if (!uploadedImage || !imageFile) {
       toast.error('Upload an image first')
+      return
+    }
+
+    if (aiProvider !== 'gemini') {
+      toast.error('Only Gemini Vision is supported in the stabilized pipeline.')
       return
     }
 
@@ -86,6 +93,9 @@ export function Toolbar() {
       return
     }
 
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 30000)
+
     setIsGenerating(true)
     setGenerationError(null)
     setGenerationProgress(5)
@@ -93,11 +103,19 @@ export function Toolbar() {
     setActiveTab('code')
 
     try {
+      setGenerationStage('preparing prompt')
+      setGenerationProgress(20)
+      const processed = await preprocessImage(imageFile)
+
+      setGenerationStage('sending request')
+      setGenerationProgress(45)
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
-          image: uploadedImage,
+          image: processed.dataUrl,
           format: exportFormat,
           provider: aiProvider,
           geminiApiKey,
@@ -105,21 +123,21 @@ export function Toolbar() {
         }),
       })
 
+      const data = await response.json()
       if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Generation failed')
+        throw new Error(data?.error || 'Generation failed')
       }
 
-      const data = await response.json()
       setGenerationStage('completed')
       setGenerationProgress(100)
-      setGeneratedCode(data.code)
+      setGeneratedCode(typeof data?.code === 'string' ? data.code : '')
       toast.success('Code generated successfully!')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Generation failed'
       setGenerationError(message)
       toast.error(message)
     } finally {
+      window.clearTimeout(timeout)
       window.setTimeout(() => {
         setIsGenerating(false)
         setGenerationStage('idle')
